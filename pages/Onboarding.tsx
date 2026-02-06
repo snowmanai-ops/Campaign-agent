@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { UploadCloud, CheckCircle, Edit2, ArrowRight, RefreshCw } from 'lucide-react';
-import { analyzeContext } from '../services/geminiService';
+import { analyzeContext } from '../services/apiService';
 import { useAppStore } from '../App';
 import { Button, Card, Textarea } from '../components/ui';
 
