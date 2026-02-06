@@ -24,21 +24,13 @@ export interface FullContext {
   isComplete: boolean;
 }
 
-export interface EmailSection {
-  hook: string;
-  context: string;
-  value: string;
-  cta: string;
-  signOff: string;
-}
-
 export interface Email {
   id: string;
   dayOffset: number; // 0 = Immediately, 1 = Day 1, etc.
   type: string; // "Welcome", "Value", "Sales"
   subject: string;
   previewText: string;
-  body: EmailSection;
+  body: string;
   status: 'draft' | 'ready';
 }
 

@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Save, GripVertical, Trash2, Copy, Download, Calendar, CheckCircle2, Circle, Clock, Mail } from 'lucide-react';
 import { useAppStore } from '../App';
 import { Button, Card, Input, Textarea, Badge } from '../components/ui';
-import { Email, EmailSection } from '../types';
+import { Email } from '../types';
 
 export const CampaignView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -17,17 +17,28 @@ export const CampaignView: React.FC = () => {
 
   const activeEmail = campaign.emails.find(e => e.id === activeEmailId);
 
-  const handleUpdateEmail = (field: keyof Email | 'body', value: any, sectionField?: keyof EmailSection) => {
+  // Helper to safely get body content regardless of old/new data structure
+  const getEmailBody = (email: any): string => {
+    if (typeof email.body === 'string') {
+      return email.body;
+    }
+    // Backward compatibility for old "EmailSection" objects
+    if (typeof email.body === 'object' && email.body !== null) {
+      return [
+        email.body.hook,
+        email.body.context,
+        email.body.value,
+        email.body.cta,
+        email.body.signOff
+      ].filter(Boolean).join('\n\n');
+    }
+    return '';
+  };
+
+  const handleUpdateEmail = (field: keyof Email, value: any) => {
     if (!activeEmail) return;
 
-    let updatedEmail = { ...activeEmail };
-
-    if (field === 'body' && sectionField) {
-      updatedEmail.body = { ...updatedEmail.body, [sectionField]: value };
-    } else {
-      (updatedEmail as any)[field] = value;
-    }
-
+    const updatedEmail = { ...activeEmail, [field]: value };
     const updatedEmails = campaign.emails.map(e => e.id === updatedEmail.id ? updatedEmail : e);
     updateCampaign(campaign.id, { emails: updatedEmails, lastEditedAt: new Date().toISOString() });
   };
@@ -44,15 +55,8 @@ Send Time: ${e.dayOffset === 0 ? 'Immediately' : `Day ${e.dayOffset}`}
 Subject: ${e.subject}
 Preview: ${e.previewText}
 
-${e.body.hook}
+${getEmailBody(e)}
 
-${e.body.context}
-
-${e.body.value}
-
-CTA: ${e.body.cta}
-
-${e.body.signOff}
 ----------------------------------------
 `).join('\n');
     }
@@ -197,59 +201,13 @@ ${e.body.signOff}
                     <div className="h-px bg-gray-200 flex-1"></div>
                   </div>
 
-                  <div className="relative group">
-                    <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-yellow-400 rounded-l-2xl"></div>
-                    <Card className="p-6 pl-8 border-l-0 rounded-l-none">
-                      <Textarea 
-                        label="The Hook (Grab Attention)" 
-                        className="bg-white text-gray-900 border-gray-200 focus:ring-yellow-400/20 focus:border-yellow-400 text-lg font-medium"
-                        rows={3}
-                        value={activeEmail.body.hook}
-                        onChange={(e) => handleUpdateEmail('body', e.target.value, 'hook')}
-                      />
-                    </Card>
-                  </div>
-
                   <Card className="p-6">
                     <Textarea 
-                      label="The Context (Why now?)" 
-                      className="bg-white text-gray-900 border-gray-200"
-                      rows={4}
-                      value={activeEmail.body.context}
-                      onChange={(e) => handleUpdateEmail('body', e.target.value, 'context')}
-                    />
-                  </Card>
-
-                  <Card className="p-6">
-                    <Textarea 
-                      label="The Value (Main Content)" 
-                      className="bg-white text-gray-900 border-gray-200"
-                      rows={8}
-                      value={activeEmail.body.value}
-                      onChange={(e) => handleUpdateEmail('body', e.target.value, 'value')}
-                    />
-                  </Card>
-
-                  <div className="relative group">
-                    <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-emerald-500 rounded-l-2xl"></div>
-                    <Card className="p-6 pl-8 border-l-0 rounded-l-none bg-emerald-50/30">
-                      <Textarea 
-                        label="Call to Action" 
-                        className="bg-white text-emerald-900 font-medium border-emerald-200 focus:border-emerald-500 focus:ring-emerald-500/20"
-                        rows={2}
-                        value={activeEmail.body.cta}
-                        onChange={(e) => handleUpdateEmail('body', e.target.value, 'cta')}
-                      />
-                    </Card>
-                  </div>
-
-                   <Card className="p-6">
-                    <Textarea 
-                      label="Sign Off" 
-                      className="bg-white text-gray-900 border-gray-200"
-                      rows={3}
-                      value={activeEmail.body.signOff}
-                      onChange={(e) => handleUpdateEmail('body', e.target.value, 'signOff')}
+                      label="Email Body" 
+                      className="bg-white text-gray-900 border-gray-200 text-base leading-relaxed font-normal p-4 min-h-[400px]"
+                      rows={15}
+                      value={getEmailBody(activeEmail)}
+                      onChange={(e) => handleUpdateEmail('body', e.target.value)}
                     />
                   </Card>
                 </div>
