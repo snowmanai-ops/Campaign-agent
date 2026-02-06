@@ -1,7 +1,8 @@
 import { FullContext, Campaign, Email, CampaignGoal } from "../types";
 
 // API base URL - change this for production
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
+declare const process: { env: { API_URL?: string } };
+const API_BASE = process.env.API_URL || "http://localhost:8000";
 
 /**
  * Analyze raw text input and extract structured context (brand, audience, offer)
