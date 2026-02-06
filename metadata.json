@@ -1,0 +1,5 @@
+{
+  "name": "Email Agent",
+  "description": "AI-powered email marketing dashboard that builds campaigns based on your business context.",
+  "requestFramePermissions": []
+}
