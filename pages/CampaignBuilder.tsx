@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Rocket, UserPlus, Users, RotateCcw, Sparkles, MessageSquare, ArrowLeft } from 'lucide-react';
 import { useAppStore } from '../App';
-import { generateCampaign } from '../services/geminiService';
+import { generateCampaign } from '../services/apiService';
 import { CampaignGoal } from '../types';
 import { Button, Card, Textarea } from '../components/ui';
 
