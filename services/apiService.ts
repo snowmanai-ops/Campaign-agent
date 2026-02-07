@@ -8,6 +8,18 @@ const toArray = (val: any): any[] => Array.isArray(val) ? val : [];
 declare const process: { env: { API_URL?: string } };
 const API_BASE = process.env.API_URL || "http://localhost:8000";
 
+/** Parse email body from API response — handles string, sectioned object, or missing body */
+function parseEmailBody(body: any): string {
+  if (!body) return "";
+  if (typeof body === "string") return body;
+  if (typeof body === "object") {
+    const sections = [body.hook, body.context, body.value, body.cta, body.signoff || body.signOff];
+    const joined = sections.filter(Boolean).join("\n\n");
+    if (joined) return joined;
+  }
+  return "";
+}
+
 /** Build common headers including the user's API key */
 function getHeaders(contentType = true): Record<string, string> {
   const headers: Record<string, string> = {};
@@ -285,13 +297,7 @@ export const generateCampaign = async (
       type: e.type || "Email",
       subject: e.subject_line || "",
       previewText: e.preview_text || "",
-      body: {
-        hook: e.body?.hook || "",
-        context: e.body?.context || "",
-        value: e.body?.value || "",
-        cta: e.body?.cta || "",
-        signOff: e.body?.signoff || "",
-      },
+      body: parseEmailBody(e.body),
       status: "draft" as const,
     }));
 
@@ -331,13 +337,7 @@ export const getCampaign = async (campaignId: string): Promise<Campaign | null> 
       type: e.type || "Email",
       subject: e.subject_line || "",
       previewText: e.preview_text || "",
-      body: {
-        hook: e.body?.hook || "",
-        context: e.body?.context || "",
-        value: e.body?.value || "",
-        cta: e.body?.cta || "",
-        signOff: e.body?.signoff || "",
-      },
+      body: parseEmailBody(e.body),
       status: "draft" as const,
     }));
 
@@ -370,13 +370,7 @@ export const updateEmail = async (
     if (updates.subject) apiUpdates.subject_line = updates.subject;
     if (updates.previewText) apiUpdates.preview_text = updates.previewText;
     if (updates.body) {
-      apiUpdates.body = {
-        hook: updates.body.hook,
-        context: updates.body.context,
-        value: updates.body.value,
-        cta: updates.body.cta,
-        signoff: updates.body.signOff,
-      };
+      apiUpdates.body = updates.body;
     }
 
     const response = await fetch(`${API_BASE}/api/campaigns/${campaignId}/emails/${emailId}`, {
