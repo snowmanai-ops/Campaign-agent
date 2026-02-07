@@ -1,8 +1,25 @@
 import { FullContext, Campaign, Email, CampaignGoal } from "../types";
+import { buildAudienceDescription } from "../utils";
+
+/** Safely coerce a value to an array — handles null, undefined, strings, and non-arrays from AI responses */
+const toArray = (val: any): any[] => Array.isArray(val) ? val : [];
 
 // API base URL - change this for production
 declare const process: { env: { API_URL?: string } };
 const API_BASE = process.env.API_URL || "http://localhost:8000";
+
+/** Build common headers including the user's API key */
+function getHeaders(contentType = true): Record<string, string> {
+  const headers: Record<string, string> = {};
+  if (contentType) headers["Content-Type"] = "application/json";
+
+  const apiKey = localStorage.getItem('emailAgentApiKey');
+  const provider = localStorage.getItem('emailAgentApiProvider');
+  if (apiKey) headers["X-API-Key"] = apiKey;
+  if (provider) headers["X-API-Provider"] = provider;
+
+  return headers;
+}
 
 /**
  * Analyze raw text input and extract structured context (brand, audience, offer)
@@ -11,12 +28,15 @@ export const analyzeContext = async (inputText: string): Promise<FullContext> =>
   try {
     const response = await fetch(`${API_BASE}/api/context/process`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: getHeaders(),
       body: JSON.stringify({
         raw_text: inputText,
-        input_type: "text"
+        input_type: "text",
+        template_fields: {
+          brand: ["name", "tagline", "mission", "voice_characteristics", "tone_scale", "dos", "donts", "vocabulary"],
+          audience: ["job_titles", "industries", "company_size", "revenue_range", "goals", "values", "fears", "objections", "pain_points", "desired_transformation", "buying_triggers"],
+          offer: ["product_name", "one_liner", "features_benefits", "usp", "pricing", "guarantees", "bonuses", "case_studies", "testimonials", "brand_story", "social_proof_stats", "persona_types"]
+        }
       }),
     });
 
@@ -27,23 +47,75 @@ export const analyzeContext = async (inputText: string): Promise<FullContext> =>
 
     const data = await response.json();
 
-    // Transform API response to match frontend FullContext type
+    const voiceCharacteristics = toArray(data.brand?.voice_characteristics);
+    const jobTitles = toArray(data.audience?.job_titles);
+    const industries = toArray(data.audience?.industries);
+    const goals = toArray(data.audience?.goals);
+    const usp = data.offer?.usp || "";
+
     return {
       brand: {
         name: data.brand?.name || "Unknown Brand",
-        voice: data.brand?.voice_characteristics?.join(", ") || "Professional",
+        tagline: data.brand?.tagline || "",
         mission: data.brand?.mission || "",
-        keywords: data.brand?.vocabulary?.preferred || [],
+        voiceCharacteristics,
+        toneScale: {
+          formalCasual: data.brand?.tone_scale?.formal_casual ?? 5,
+          seriousHumorous: data.brand?.tone_scale?.serious_humorous ?? 5,
+          respectfulIrreverent: data.brand?.tone_scale?.respectful_irreverent ?? 5,
+        },
+        dos: toArray(data.brand?.dos),
+        donts: toArray(data.brand?.donts),
+        keywords: toArray(data.brand?.vocabulary?.preferred),
+        avoidWords: toArray(data.brand?.vocabulary?.avoid),
+        voice: voiceCharacteristics.join(", ") || "Professional",
       },
       audience: {
-        description: data.audience?.job_titles?.join(", ") + " in " + data.audience?.industries?.join(", ") || "Target audience",
-        painPoints: data.audience?.pain_points || [],
-        desires: data.audience?.goals || [],
+        jobTitles,
+        industries,
+        companySize: data.audience?.company_size || "",
+        revenueRange: data.audience?.revenue_range || "",
+        goals,
+        values: toArray(data.audience?.values),
+        fears: toArray(data.audience?.fears),
+        objections: toArray(data.audience?.objections),
+        painPoints: toArray(data.audience?.pain_points),
+        desiredTransformation: data.audience?.desired_transformation || "",
+        buyingTriggers: toArray(data.audience?.buying_triggers),
+        description: buildAudienceDescription({ jobTitles, industries }),
+        desires: goals,
       },
       offer: {
         name: data.offer?.product_name || "Product",
         pitch: data.offer?.one_liner || "",
-        details: data.offer?.usp || "",
+        featuresBenefits: toArray(data.offer?.features_benefits).map((fb: any) => ({
+          feature: fb.feature || "",
+          benefit: fb.benefit || "",
+          outcome: fb.outcome || "",
+        })),
+        usp,
+        pricing: data.offer?.pricing || "",
+        guarantees: data.offer?.guarantees || "",
+        bonuses: toArray(data.offer?.bonuses),
+        caseStudies: toArray(data.offer?.case_studies).map((cs: any) => ({
+          company: cs.company || "",
+          challenge: cs.challenge || "",
+          result: cs.result || "",
+          metric: cs.metric || "",
+        })),
+        testimonials: toArray(data.offer?.testimonials).map((t: any) => ({
+          quote: t.quote || "",
+          author: t.author || "",
+          role: t.role || "",
+          company: t.company || "",
+        })),
+        brandStory: typeof data.offer?.brand_story === "string" ? data.offer.brand_story : "",
+        socialProofStats: toArray(data.offer?.social_proof_stats),
+        personaTypes: toArray(data.offer?.persona_types).map((p: any) => ({
+          label: p.label || "",
+          description: p.description || "",
+        })),
+        details: usp,
       },
       isComplete: true,
     };
@@ -54,52 +126,118 @@ export const analyzeContext = async (inputText: string): Promise<FullContext> =>
 };
 
 /**
+ * Extract text from an uploaded file (PDF, DOCX, TXT, MD, CSV)
+ */
+export const extractTextFromFile = async (file: File): Promise<{ text: string; filename: string }> => {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("extract_only", "true");
+
+  const response = await fetch(`${API_BASE}/api/context/process/file`, {
+    method: "POST",
+    headers: getHeaders(false),
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: "Failed to extract text from file" }));
+    throw new Error(error.detail || "Failed to extract text from file");
+  }
+
+  return response.json();
+};
+
+/**
+ * Scrape a URL and extract visible text content
+ */
+export const extractTextFromUrl = async (url: string): Promise<{ text: string; url: string; title: string }> => {
+  const response = await fetch(`${API_BASE}/api/context/process/url`, {
+    method: "POST",
+    headers: getHeaders(),
+    body: JSON.stringify({ url }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: "Failed to extract text from URL" }));
+    throw new Error(error.detail || "Failed to extract text from URL");
+  }
+
+  return response.json();
+};
+
+/**
  * Save context to the backend (persists to .agent/context/*.md files)
  */
 export const saveContext = async (context: FullContext): Promise<void> => {
   try {
-    // Transform frontend context to API format
     const apiContext = {
       brand: {
         name: context.brand.name,
-        tagline: "",
+        tagline: context.brand.tagline,
         mission: context.brand.mission,
-        voice_characteristics: context.brand.voice.split(", "),
-        tone_scale: { formal_casual: 5, serious_humorous: 5, respectful_irreverent: 5 },
-        dos: [],
-        donts: [],
-        vocabulary: { preferred: context.brand.keywords, avoid: [] },
+        voice_characteristics: context.brand.voiceCharacteristics,
+        tone_scale: {
+          formal_casual: context.brand.toneScale.formalCasual,
+          serious_humorous: context.brand.toneScale.seriousHumorous,
+          respectful_irreverent: context.brand.toneScale.respectfulIrreverent,
+        },
+        dos: context.brand.dos,
+        donts: context.brand.donts,
+        vocabulary: {
+          preferred: context.brand.keywords,
+          avoid: context.brand.avoidWords,
+        },
         example_copy: [],
       },
       audience: {
-        job_titles: [context.audience.description],
-        industries: [],
-        company_size: "",
-        revenue_range: "",
-        goals: context.audience.desires,
-        values: [],
-        fears: [],
-        objections: [],
+        job_titles: context.audience.jobTitles,
+        industries: context.audience.industries,
+        company_size: context.audience.companySize,
+        revenue_range: context.audience.revenueRange,
+        goals: context.audience.goals,
+        values: context.audience.values,
+        fears: context.audience.fears,
+        objections: context.audience.objections,
         pain_points: context.audience.painPoints,
-        desired_transformation: "",
-        buying_triggers: [],
+        desired_transformation: context.audience.desiredTransformation,
+        buying_triggers: context.audience.buyingTriggers,
       },
       offer: {
         product_name: context.offer.name,
         one_liner: context.offer.pitch,
-        features_benefits: [],
-        usp: context.offer.details,
-        pricing: "",
-        guarantees: "",
-        bonuses: [],
+        features_benefits: context.offer.featuresBenefits.map(fb => ({
+          feature: fb.feature,
+          benefit: fb.benefit,
+          outcome: fb.outcome,
+        })),
+        usp: context.offer.usp,
+        pricing: context.offer.pricing,
+        guarantees: context.offer.guarantees,
+        bonuses: context.offer.bonuses,
+        case_studies: (context.offer.caseStudies || []).map(cs => ({
+          company: cs.company,
+          challenge: cs.challenge,
+          result: cs.result,
+          metric: cs.metric,
+        })),
+        testimonials: (context.offer.testimonials || []).map(t => ({
+          quote: t.quote,
+          author: t.author,
+          role: t.role,
+          company: t.company,
+        })),
+        brand_story: context.offer.brandStory || "",
+        social_proof_stats: context.offer.socialProofStats || [],
+        persona_types: (context.offer.personaTypes || []).map(p => ({
+          label: p.label,
+          description: p.description,
+        })),
       },
     };
 
     const response = await fetch(`${API_BASE}/api/context/save-processed`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: getHeaders(),
       body: JSON.stringify(apiContext),
     });
 
@@ -108,7 +246,6 @@ export const saveContext = async (context: FullContext): Promise<void> => {
     }
   } catch (error) {
     console.error("Failed to save context:", error);
-    // Non-critical - don't throw, just log
   }
 };
 
@@ -127,9 +264,7 @@ export const generateCampaign = async (
     // Then generate the campaign
     const response = await fetch(`${API_BASE}/api/campaigns/`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: getHeaders(),
       body: JSON.stringify({
         campaign_type: goal,
         additional_details: additionalDetails || null,
@@ -180,7 +315,9 @@ export const generateCampaign = async (
  */
 export const getCampaign = async (campaignId: string): Promise<Campaign | null> => {
   try {
-    const response = await fetch(`${API_BASE}/api/campaigns/${campaignId}`);
+    const response = await fetch(`${API_BASE}/api/campaigns/${campaignId}`, {
+      headers: getHeaders(false),
+    });
 
     if (!response.ok) {
       return null;
@@ -244,9 +381,7 @@ export const updateEmail = async (
 
     const response = await fetch(`${API_BASE}/api/campaigns/${campaignId}/emails/${emailId}`, {
       method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: getHeaders(),
       body: JSON.stringify(apiUpdates),
     });
 
@@ -267,7 +402,9 @@ export const exportCampaign = async (
   format: "json" | "txt" | "csv" = "txt"
 ): Promise<string> => {
   try {
-    const response = await fetch(`${API_BASE}/api/campaigns/${campaignId}/export?format=${format}`);
+    const response = await fetch(`${API_BASE}/api/campaigns/${campaignId}/export?format=${format}`, {
+      headers: getHeaders(false),
+    });
 
     if (!response.ok) {
       throw new Error("Failed to export campaign");

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, Mail, BarChart3, Clock, ArrowRight, Settings, Trash2 } from 'lucide-react';
+import { Plus, Mail, BarChart3, Clock, ArrowRight, Settings, Trash2, Key } from 'lucide-react';
 import { useAppStore } from '../App';
 import { Card, Button, Badge } from '../components/ui';
 
@@ -26,6 +26,11 @@ export const Dashboard: React.FC = () => {
           <p className="text-gray-500 mt-1">Manage your email campaigns and brand settings.</p>
         </div>
         <div className="flex gap-3">
+          <Link to="/setup">
+            <Button variant="outline" className="gap-2">
+              <Key size={18} /> API Key
+            </Button>
+          </Link>
           <Link to="/onboarding">
             <Button variant="outline" className="gap-2">
               <Settings size={18} /> Context

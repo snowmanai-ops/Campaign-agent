@@ -1,5 +1,5 @@
-import React from 'react';
-import { Loader2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Loader2, X, Plus } from 'lucide-react';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
@@ -79,9 +79,111 @@ export const Input: React.FC<React.InputHTMLAttributes<HTMLInputElement> & { lab
 export const Textarea: React.FC<React.TextareaHTMLAttributes<HTMLTextAreaElement> & { label?: string }> = ({ label, className = '', ...props }) => (
   <div className="w-full">
     {label && <label className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>}
-    <textarea 
+    <textarea
       className={`block w-full rounded-xl border-gray-200 bg-white text-gray-900 shadow-sm focus:border-slate-500 focus:ring-slate-500 sm:text-sm p-3 placeholder:text-gray-400 ${className}`}
       {...props}
     />
+  </div>
+);
+
+// --- TagInput ---
+
+interface TagInputProps {
+  label?: string;
+  tags: string[];
+  onChange: (tags: string[]) => void;
+  placeholder?: string;
+  color?: 'indigo' | 'pink' | 'emerald' | 'gray';
+}
+
+const tagColors = {
+  indigo: { bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-100', x: 'hover:text-indigo-900' },
+  pink: { bg: 'bg-pink-50', text: 'text-pink-700', border: 'border-pink-100', x: 'hover:text-pink-900' },
+  emerald: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-100', x: 'hover:text-emerald-900' },
+  gray: { bg: 'bg-gray-50', text: 'text-gray-600', border: 'border-gray-100', x: 'hover:text-gray-900' },
+};
+
+export const TagInput: React.FC<TagInputProps> = ({ label, tags, onChange, placeholder = 'Add item...', color = 'gray' }) => {
+  const [inputValue, setInputValue] = useState('');
+  const c = tagColors[color];
+
+  const addTag = (value: string) => {
+    const trimmed = value.trim();
+    if (trimmed && !tags.includes(trimmed)) {
+      onChange([...tags, trimmed]);
+    }
+    setInputValue('');
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if ((e.key === 'Enter' || e.key === ',') && inputValue.trim()) {
+      e.preventDefault();
+      addTag(inputValue);
+    }
+    if (e.key === 'Backspace' && !inputValue && tags.length > 0) {
+      onChange(tags.slice(0, -1));
+    }
+  };
+
+  return (
+    <div className="w-full">
+      {label && <label className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>}
+      <div className="min-h-[44px] w-full rounded-xl border border-gray-200 bg-white p-2 focus-within:border-slate-500 focus-within:ring-1 focus-within:ring-slate-500 transition-all">
+        <div className="flex flex-wrap gap-1.5">
+          {tags.map((tag, i) => (
+            <span key={`${tag}-${i}`} className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border ${c.bg} ${c.text} ${c.border}`}>
+              {tag}
+              <button
+                type="button"
+                onClick={() => onChange(tags.filter((_, idx) => idx !== i))}
+                className={`${c.text} ${c.x} transition-colors`}
+              >
+                <X size={12} />
+              </button>
+            </span>
+          ))}
+          <input
+            type="text"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onBlur={() => { if (inputValue.trim()) addTag(inputValue); }}
+            placeholder={tags.length === 0 ? placeholder : ''}
+            className="flex-1 min-w-[100px] text-sm text-gray-900 placeholder:text-gray-400 outline-none bg-transparent py-1 px-1"
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- RangeSlider ---
+
+interface RangeSliderProps {
+  label?: string;
+  leftLabel: string;
+  rightLabel: string;
+  value: number;
+  onChange: (value: number) => void;
+  min?: number;
+  max?: number;
+}
+
+export const RangeSlider: React.FC<RangeSliderProps> = ({ label, leftLabel, rightLabel, value, onChange, min = 1, max = 10 }) => (
+  <div className="w-full">
+    {label && <label className="block text-sm font-medium text-gray-700 mb-2">{label}</label>}
+    <div className="flex items-center gap-3">
+      <span className="text-xs text-gray-500 w-20 text-right shrink-0">{leftLabel}</span>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-slate-900"
+      />
+      <span className="text-xs text-gray-500 w-20 shrink-0">{rightLabel}</span>
+      <span className="text-sm font-medium text-gray-700 w-6 text-center shrink-0">{value}</span>
+    </div>
   </div>
 );
