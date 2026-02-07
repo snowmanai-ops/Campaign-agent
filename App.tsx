@@ -159,10 +159,9 @@ const App: React.FC = () => {
             />
           } />
           <Route path="/" element={
-            !hasApiKey ? <Navigate to="/setup" /> :
             context ? <Navigate to="/dashboard" /> : <Navigate to="/onboarding" />
           } />
-          <Route path="/onboarding" element={hasApiKey ? <Onboarding /> : <Navigate to="/setup" />} />
+          <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/dashboard" element={
             !hasApiKey ? <Navigate to="/setup" /> :
             context ? <Dashboard /> : <Navigate to="/onboarding" />

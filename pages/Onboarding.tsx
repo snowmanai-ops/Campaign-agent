@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { UploadCloud, CheckCircle, ArrowRight, RefreshCw, Globe, FileText, File, X, Loader2, AlertCircle, Pencil } from 'lucide-react';
+import { UploadCloud, CheckCircle, ArrowRight, RefreshCw, Globe, FileText, File, X, Loader2, AlertCircle, Pencil, Key, Eye, EyeOff, ExternalLink } from 'lucide-react';
 import { analyzeContext, extractTextFromFile, extractTextFromUrl, saveContext } from '../services/apiService';
 import { useAppStore } from '../App';
 import { buildAudienceDescription } from '../utils';
@@ -22,7 +22,7 @@ interface Source {
 
 export const Onboarding: React.FC = () => {
   const navigate = useNavigate();
-  const { setContext, userContext } = useAppStore();
+  const { setContext, userContext, apiKey, setApiKey } = useAppStore();
   const [sources, setSources] = useState<Source[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analyzedData, setAnalyzedData] = useState<any>(null);
@@ -32,6 +32,13 @@ export const Onboarding: React.FC = () => {
   const [textInput, setTextInput] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounter = useRef(0);
+
+  // API Key modal state
+  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
+  const [modalProvider, setModalProvider] = useState<'openai' | 'anthropic'>('openai');
+  const [modalApiKey, setModalApiKey] = useState('');
+  const [showKey, setShowKey] = useState(false);
+  const [keyError, setKeyError] = useState('');
 
   useEffect(() => {
     if (userContext) {
@@ -182,8 +189,7 @@ export const Onboarding: React.FC = () => {
   const hasExtractingSources = sources.some(s => s.status === 'extracting');
   const canGenerate = readySources.length > 0 && !hasExtractingSources;
 
-  const handleAnalyze = async () => {
-    if (!canGenerate) return;
+  const runAnalysis = async () => {
     setIsAnalyzing(true);
     try {
       const combinedText = readySources
@@ -197,6 +203,38 @@ export const Onboarding: React.FC = () => {
     } finally {
       setIsAnalyzing(false);
     }
+  };
+
+  const handleAnalyze = () => {
+    if (!canGenerate) return;
+    if (!apiKey) {
+      setShowApiKeyModal(true);
+      return;
+    }
+    runAnalysis();
+  };
+
+  const handleApiKeyConfirm = () => {
+    const trimmed = modalApiKey.trim();
+    if (!trimmed) {
+      setKeyError('Please enter your API key.');
+      return;
+    }
+    if (modalProvider === 'openai' && !trimmed.startsWith('sk-')) {
+      setKeyError('OpenAI keys typically start with "sk-". Double-check your key.');
+      return;
+    }
+    if (modalProvider === 'anthropic' && !trimmed.startsWith('sk-ant-')) {
+      setKeyError('Anthropic keys typically start with "sk-ant-". Double-check your key.');
+      return;
+    }
+    setKeyError('');
+    setApiKey(modalProvider, trimmed);
+    setShowApiKeyModal(false);
+    setModalApiKey('');
+    setShowKey(false);
+    // Start analysis now that key is saved
+    runAnalysis();
   };
 
   const handleConfirm = () => {
@@ -766,6 +804,128 @@ export const Onboarding: React.FC = () => {
                 Add text
               </Button>
             </div>
+          </Card>
+        </div>
+      )}
+
+      {/* API Key Modal */}
+      {showApiKeyModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm"
+          onClick={() => { setShowApiKeyModal(false); setKeyError(''); }}
+        >
+          <Card
+            className="w-full max-w-lg mx-4 p-6 shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 mb-1 text-left">
+              <div className="p-2.5 bg-slate-900 rounded-xl">
+                <Key className="w-5 h-5 text-white" />
+              </div>
+              <h3 className="font-bold text-lg text-gray-900">Connect Your AI</h3>
+            </div>
+            <p className="text-sm text-gray-500 mb-5 text-left">
+              Enter your API key to power the email agent. Your key is stored locally — never sent to us.
+            </p>
+
+            {/* Provider Selection */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2 text-left">AI Provider</label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => { setModalProvider('openai'); setKeyError(''); }}
+                  className={`p-3 rounded-xl border text-sm font-medium transition-all cursor-pointer ${
+                    modalProvider === 'openai'
+                      ? 'border-slate-900 bg-slate-50 text-slate-900 ring-1 ring-slate-900'
+                      : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                  }`}
+                >
+                  OpenAI
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setModalProvider('anthropic'); setKeyError(''); }}
+                  className={`p-3 rounded-xl border text-sm font-medium transition-all cursor-pointer ${
+                    modalProvider === 'anthropic'
+                      ? 'border-slate-900 bg-slate-50 text-slate-900 ring-1 ring-slate-900'
+                      : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                  }`}
+                >
+                  Anthropic
+                </button>
+              </div>
+            </div>
+
+            {/* API Key Input */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1.5 text-left">API Key</label>
+              <div className="relative">
+                <input
+                  type={showKey ? 'text' : 'password'}
+                  value={modalApiKey}
+                  onChange={(e) => { setModalApiKey(e.target.value); setKeyError(''); }}
+                  placeholder={modalProvider === 'openai' ? 'sk-...' : 'sk-ant-...'}
+                  className="block w-full rounded-xl border-gray-200 bg-white text-gray-900 shadow-sm focus:border-slate-500 focus:ring-slate-500 sm:text-sm p-3 pr-10 placeholder:text-gray-400"
+                  autoComplete="off"
+                  spellCheck={false}
+                  autoFocus
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleApiKeyConfirm(); }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowKey(!showKey)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                >
+                  {showKey ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
+
+            {keyError && (
+              <div className="flex items-start gap-2 text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl p-3 mb-4 text-left">
+                <AlertCircle size={16} className="mt-0.5 shrink-0" />
+                {keyError}
+              </div>
+            )}
+
+            {/* Where to get a key */}
+            <div className="bg-gray-50 rounded-xl p-4 text-sm text-gray-600 space-y-2 mb-5 text-left">
+              <p className="font-medium text-gray-700">Where to get a key:</p>
+              {modalProvider === 'openai' ? (
+                <a
+                  href="https://platform.openai.com/api-keys"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-700 font-medium"
+                >
+                  OpenAI API Keys <ExternalLink size={14} />
+                </a>
+              ) : (
+                <a
+                  href="https://console.anthropic.com/settings/keys"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-700 font-medium"
+                >
+                  Anthropic API Keys <ExternalLink size={14} />
+                </a>
+              )}
+              <p className="text-gray-500">You'll need a funded account with API credits.</p>
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => { setShowApiKeyModal(false); setKeyError(''); setModalApiKey(''); setShowKey(false); }}>
+                Cancel
+              </Button>
+              <Button onClick={handleApiKeyConfirm} className="gap-2">
+                Confirm <ArrowRight size={16} />
+              </Button>
+            </div>
+
+            <p className="text-xs text-gray-400 mt-4 text-center">
+              Your key is stored in your browser's local storage only. It's sent directly to {modalProvider === 'openai' ? 'OpenAI' : 'Anthropic'} — we never see or store it.
+            </p>
           </Card>
         </div>
       )}
