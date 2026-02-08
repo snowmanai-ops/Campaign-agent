@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Rocket, UserPlus, Users, RotateCcw, Sparkles, MessageSquare, ArrowLeft, Newspaper, DollarSign, GraduationCap, ShoppingBag, RefreshCw, CalendarHeart, Megaphone, TrendingUp } from 'lucide-react';
 import { useAppStore } from '../App';
@@ -33,6 +33,31 @@ export const CampaignBuilder: React.FC = () => {
   const [selectedGoal, setSelectedGoal] = useState<CampaignGoal | null>(null);
   const [additionalDetails, setAdditionalDetails] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [messageIndex, setMessageIndex] = useState(0);
+
+  const loadingMessages = [
+    "Crafting your campaign...",
+    "Analyzing your brand voice...",
+    "Brainstorming hooks...",
+    "Writing subject lines...",
+    "Sequencing your emails...",
+    "Optimizing for conversions...",
+    "Adding persuasion magic...",
+    "Polishing the copy...",
+    "Fine-tuning the CTAs...",
+    "Almost there...",
+  ];
+
+  useEffect(() => {
+    if (!isGenerating) {
+      setMessageIndex(0);
+      return;
+    }
+    const interval = setInterval(() => {
+      setMessageIndex((prev) => (prev + 1) % loadingMessages.length);
+    }, 2500);
+    return () => clearInterval(interval);
+  }, [isGenerating]);
 
   const handleCreate = async () => {
     if (!selectedGoal || !userContext) return;
@@ -54,7 +79,19 @@ export const CampaignBuilder: React.FC = () => {
     return (
       <div className="flex flex-col items-center justify-center min-h-[80vh]">
         <div className="w-20 h-20 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin mb-8"></div>
-        <h2 className="text-3xl font-bold text-gray-900 mb-3 tracking-tight">Crafting your campaign...</h2>
+        <h2
+          key={messageIndex}
+          className="text-3xl font-bold text-gray-900 mb-3 tracking-tight animate-fade-in"
+          style={{ animation: 'fadeIn 0.4s ease-in-out' }}
+        >
+          {loadingMessages[messageIndex]}
+        </h2>
+        <style>{`
+          @keyframes fadeIn {
+            0% { opacity: 0; transform: translateY(4px); }
+            100% { opacity: 1; transform: translateY(0); }
+          }
+        `}</style>
         <p className="text-gray-500 max-w-md text-center text-lg leading-relaxed">
           Our AI agent is analyzing your brand "{userContext?.brand.name}" and writing high-converting emails for a {selectedGoal} sequence.
         </p>
