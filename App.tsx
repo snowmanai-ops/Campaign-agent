@@ -12,6 +12,7 @@ import { FullContext, Campaign, UserState } from './types';
 import { buildAudienceDescription } from './utils';
 import {
   getOrCreateDefaultWorkspace,
+  cleanupDuplicateDefaultWorkspaces,
   saveWorkspaceContext,
   workspaceToContext,
   loadCampaigns,
@@ -176,6 +177,8 @@ const AppInner: React.FC = () => {
         try {
           console.log('[App] Creating/getting default workspace...');
           await getOrCreateDefaultWorkspace(userId);
+          console.log('[App] Cleaning up duplicate defaults...');
+          await cleanupDuplicateDefaultWorkspaces(userId);
           console.log('[App] Loading workspaces...');
           const allWorkspaces = await listWorkspaces(userId);
           console.log('[App] Got workspaces:', allWorkspaces.length);
@@ -348,22 +351,24 @@ const AppInner: React.FC = () => {
         <Routes>
           <Route path="/" element={
             dataLoading ? <LoadingScreen /> :
-            context ? <Navigate to="/dashboard" /> : <Navigate to="/onboarding" />
+            (context || workspaces.length > 0) ? <Navigate to="/dashboard" /> : <Navigate to="/onboarding" />
           } />
           <Route path="/login" element={<Login />} />
           <Route path="/upgrade-success" element={<UpgradeSuccess />} />
           <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/dashboard" element={
             dataLoading ? <LoadingScreen /> :
-            context ? <Dashboard /> : <Navigate to="/onboarding" />
+            (context || workspaces.length > 0) ? <Dashboard /> : <Navigate to="/onboarding" />
           } />
           <Route path="/campaigns/new" element={
             dataLoading ? <LoadingScreen /> :
-            context ? <CampaignBuilder /> : <Navigate to="/onboarding" />
+            context ? <CampaignBuilder /> :
+            workspaces.length > 0 ? <Navigate to="/dashboard" /> : <Navigate to="/onboarding" />
           } />
           <Route path="/campaigns/:id" element={
             dataLoading ? <LoadingScreen /> :
-            context ? <CampaignView /> : <Navigate to="/onboarding" />
+            context ? <CampaignView /> :
+            workspaces.length > 0 ? <Navigate to="/dashboard" /> : <Navigate to="/onboarding" />
           } />
         </Routes>
       </BrowserRouter>

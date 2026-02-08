@@ -21,15 +21,16 @@ function requireSupabase() {
 
 export async function getOrCreateDefaultWorkspace(userId: string): Promise<Workspace> {
   const client = requireSupabase();
-  // Try to find existing default workspace
-  const { data: existing, error: fetchErr } = await client
+  // Use limit(1) instead of single() to handle 0, 1, or multiple defaults gracefully
+  const { data: rows } = await client
     .from('workspaces')
     .select('*')
     .eq('user_id', userId)
     .eq('is_default', true)
-    .single();
+    .order('created_at', { ascending: true })
+    .limit(1);
 
-  if (existing) return existing as Workspace;
+  if (rows && rows.length > 0) return rows[0] as Workspace;
 
   // Create default workspace
   const { data: created, error: createErr } = await client
@@ -47,6 +48,50 @@ export async function getOrCreateDefaultWorkspace(userId: string): Promise<Works
 
   if (createErr) throw new Error(`Failed to create workspace: ${createErr.message}`);
   return created as Workspace;
+}
+
+export async function cleanupDuplicateDefaultWorkspaces(userId: string): Promise<void> {
+  const client = requireSupabase();
+
+  const { data: defaults, error } = await client
+    .from('workspaces')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('is_default', true)
+    .order('created_at', { ascending: true });
+
+  if (error || !defaults || defaults.length <= 1) return;
+
+  const canonical = defaults[0];
+  const duplicates = defaults.slice(1);
+
+  for (const dup of duplicates) {
+    const hasData = dup.brand_context?.name || dup.audience_context?.jobTitles?.length;
+
+    if (hasData) {
+      // Keep workspace but demote from default
+      await client
+        .from('workspaces')
+        .update({
+          is_default: false,
+          name: dup.name === 'My Brand'
+            ? `My Brand (${new Date(dup.created_at).toLocaleDateString()})`
+            : dup.name,
+        })
+        .eq('id', dup.id);
+    } else {
+      // Empty duplicate — move campaigns to canonical, then delete
+      await client
+        .from('campaigns')
+        .update({ workspace_id: canonical.id })
+        .eq('workspace_id', dup.id);
+
+      await client
+        .from('workspaces')
+        .delete()
+        .eq('id', dup.id);
+    }
+  }
 }
 
 export async function saveWorkspaceContext(

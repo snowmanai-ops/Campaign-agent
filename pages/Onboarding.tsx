@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { UploadCloud, CheckCircle, ArrowRight, RefreshCw, Globe, FileText, File, X, Loader2, AlertCircle, Pencil } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { UploadCloud, CheckCircle, ArrowRight, ArrowLeft, RefreshCw, Globe, FileText, File, X, Loader2, AlertCircle, Pencil } from 'lucide-react';
 import { analyzeContext, extractTextFromFile, extractTextFromUrl, saveContext } from '../services/apiService';
 import { useAppStore } from '../App';
 import { buildAudienceDescription } from '../utils';
 import { Button, Card, Textarea, Input } from '../components/ui';
 import { ContextDrawer, BrandEditor, AudienceEditor, OfferEditor } from '../components/ContextEditor';
+import { WorkspaceSwitcher } from '../components/WorkspaceSwitcher';
+import { UserMenu } from '../components/UserMenu';
 import { BrandContext, AudienceContext, OfferContext } from '../types';
 
 type SourceType = 'file' | 'url' | 'text';
@@ -22,7 +24,20 @@ interface Source {
 
 export const Onboarding: React.FC = () => {
   const navigate = useNavigate();
-  const { setContext, userContext } = useAppStore();
+  const {
+    setContext,
+    userContext,
+    workspaces,
+    activeWorkspaceId,
+    switchWorkspace,
+    handleCreateWorkspace,
+    handleRenameWorkspace,
+    handleDeleteWorkspace,
+  } = useAppStore();
+
+  const canSkipOnboarding = workspaces.some(ws =>
+    ws.brand_context?.name || ws.audience_context?.jobTitles?.length
+  );
   const [sources, setSources] = useState<Source[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analyzedData, setAnalyzedData] = useState<any>(null);
@@ -289,7 +304,27 @@ export const Onboarding: React.FC = () => {
 
   if (analyzedData) {
     return (
-      <div className="max-w-5xl mx-auto px-6 py-16">
+      <div className="max-w-5xl mx-auto px-6 py-12">
+        <header className="flex justify-between items-center mb-8">
+          <div>
+            {canSkipOnboarding && (
+              <Link to="/dashboard" className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 transition-colors">
+                <ArrowLeft size={16} /> Back to Dashboard
+              </Link>
+            )}
+          </div>
+          <div className="flex gap-3 items-center">
+            <WorkspaceSwitcher
+              workspaces={workspaces}
+              activeWorkspaceId={activeWorkspaceId}
+              onSwitch={switchWorkspace}
+              onCreate={handleCreateWorkspace}
+              onRename={handleRenameWorkspace}
+              onDelete={handleDeleteWorkspace}
+            />
+            <UserMenu />
+          </div>
+        </header>
         <div className="text-center mb-12">
              <h1 className="text-4xl font-bold text-slate-900 mb-4 tracking-tight">Your Brand Profile</h1>
              <p className="text-lg text-gray-500 max-w-2xl mx-auto">
@@ -560,8 +595,28 @@ export const Onboarding: React.FC = () => {
   // =====================
 
   return (
-    <div className="max-w-3xl mx-auto px-6 py-20 text-center">
-      <div className="mb-12">
+    <div className="max-w-3xl mx-auto px-6 py-12">
+      <header className="flex justify-between items-center mb-8">
+        <div>
+          {canSkipOnboarding && (
+            <Link to="/dashboard" className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 transition-colors">
+              <ArrowLeft size={16} /> Back to Dashboard
+            </Link>
+          )}
+        </div>
+        <div className="flex gap-3 items-center">
+          <WorkspaceSwitcher
+            workspaces={workspaces}
+            activeWorkspaceId={activeWorkspaceId}
+            onSwitch={switchWorkspace}
+            onCreate={handleCreateWorkspace}
+            onRename={handleRenameWorkspace}
+            onDelete={handleDeleteWorkspace}
+          />
+          <UserMenu />
+        </div>
+      </header>
+      <div className="mb-12 text-center">
         <h1 className="text-3xl sm:text-5xl font-bold text-slate-900 mb-6 tracking-tight">
           Your email campaigns ready to launch in <span className="text-indigo-600">3 minutes</span>
         </h1>

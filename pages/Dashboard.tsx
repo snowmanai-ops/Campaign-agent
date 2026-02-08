@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, Mail, BarChart3, ArrowRight, Settings, Trash2 } from 'lucide-react';
+import { Plus, Mail, BarChart3, ArrowRight, Settings, Trash2, AlertCircle } from 'lucide-react';
 import { useAppStore } from '../App';
 import { Card, Button, Badge } from '../components/ui';
 import { UserMenu } from '../components/UserMenu';
@@ -51,11 +51,17 @@ export const Dashboard: React.FC = () => {
               <Settings size={18} /> Context
             </Button>
           </Link>
-          <Link to="/campaigns/new">
-            <Button size="lg" className="gap-2 shadow-md hover:shadow-lg transition-all">
+          {userContext ? (
+            <Link to="/campaigns/new">
+              <Button size="lg" className="gap-2 shadow-md hover:shadow-lg transition-all">
+                <Plus size={18} /> New Campaign
+              </Button>
+            </Link>
+          ) : (
+            <Button size="lg" className="gap-2 opacity-50 cursor-not-allowed" disabled>
               <Plus size={18} /> New Campaign
             </Button>
-          </Link>
+          )}
           <UserMenu />
         </div>
       </header>
@@ -93,6 +99,30 @@ export const Dashboard: React.FC = () => {
           </div>
         </Card>
       </div>
+
+      {/* Context setup prompt */}
+      {!userContext && (
+        <Card className="p-8 mb-12 border-amber-200 bg-amber-50/30">
+          <div className="flex items-start gap-4">
+            <div className="p-3 bg-amber-100 text-amber-600 rounded-xl shrink-0">
+              <AlertCircle size={24} />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                Set up your brand context
+              </h3>
+              <p className="text-gray-600 mb-4">
+                This workspace doesn't have brand context yet. Set it up to start generating campaigns.
+              </p>
+              <Link to="/onboarding">
+                <Button className="gap-2">
+                  <Settings size={16} /> Set Up Context
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Recent Activity */}
       <div className="flex justify-between items-center mb-6">
