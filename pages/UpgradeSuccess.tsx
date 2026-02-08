@@ -14,7 +14,7 @@ export const UpgradeSuccess: React.FC = () => {
     if (user) {
       // Small delay to let the webhook process
       const timer = setTimeout(() => {
-        supabase.auth.refreshSession();
+        supabase?.auth.refreshSession();
       }, 2000);
       return () => clearTimeout(timer);
     }

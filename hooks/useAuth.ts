@@ -39,6 +39,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isPremium, setIsPremium] = useState(false);
 
   const fetchProfile = useCallback(async (userId: string) => {
+    if (!supabase) return null;
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
@@ -65,6 +66,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (!supabase) {
+      setLoading(false);
+      return;
+    }
+
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
         const prof = await fetchProfile(session.user.id);
@@ -89,6 +95,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [fetchProfile, updateState]);
 
   const signInWithGoogle = useCallback(async () => {
+    if (!supabase) throw new Error('Authentication is not configured');
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -99,6 +106,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
+    if (!supabase) return;
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
   }, []);

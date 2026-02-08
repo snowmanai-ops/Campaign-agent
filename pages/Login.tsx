@@ -27,6 +27,11 @@ export const Login: React.FC = () => {
     setError(null);
     setCheckingOut(true);
     try {
+      if (!supabase) {
+        setError('Premium features are not configured.');
+        setCheckingOut(false);
+        return;
+      }
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         setError('Please sign in first.');

@@ -14,9 +14,15 @@ export interface Workspace {
   created_at: string;
 }
 
+function requireSupabase() {
+  if (!supabase) throw new Error('Supabase is not configured. Premium features are unavailable.');
+  return supabase;
+}
+
 export async function getOrCreateDefaultWorkspace(userId: string): Promise<Workspace> {
+  const client = requireSupabase();
   // Try to find existing default workspace
-  const { data: existing, error: fetchErr } = await supabase
+  const { data: existing, error: fetchErr } = await client
     .from('workspaces')
     .select('*')
     .eq('user_id', userId)
@@ -26,7 +32,7 @@ export async function getOrCreateDefaultWorkspace(userId: string): Promise<Works
   if (existing) return existing as Workspace;
 
   // Create default workspace
-  const { data: created, error: createErr } = await supabase
+  const { data: created, error: createErr } = await client
     .from('workspaces')
     .insert({
       user_id: userId,
@@ -47,7 +53,8 @@ export async function saveWorkspaceContext(
   workspaceId: string,
   context: FullContext
 ): Promise<void> {
-  const { error } = await supabase
+  const client = requireSupabase();
+  const { error } = await client
     .from('workspaces')
     .update({
       brand_context: context.brand,
@@ -79,7 +86,8 @@ export async function loadCampaigns(
   userId: string,
   workspaceId: string
 ): Promise<Campaign[]> {
-  const { data, error } = await supabase
+  const client = requireSupabase();
+  const { data, error } = await client
     .from('campaigns')
     .select('*')
     .eq('user_id', userId)
@@ -104,7 +112,8 @@ export async function saveCampaign(
   workspaceId: string,
   campaign: Campaign
 ): Promise<void> {
-  const { error } = await supabase
+  const client = requireSupabase();
+  const { error } = await client
     .from('campaigns')
     .upsert({
       id: campaign.id,
@@ -122,7 +131,8 @@ export async function saveCampaign(
 }
 
 export async function deleteCampaignFromDb(campaignId: string): Promise<void> {
-  const { error } = await supabase
+  const client = requireSupabase();
+  const { error } = await client
     .from('campaigns')
     .delete()
     .eq('id', campaignId);
@@ -133,7 +143,8 @@ export async function deleteCampaignFromDb(campaignId: string): Promise<void> {
 // --- Workspace Management ---
 
 export async function listWorkspaces(userId: string): Promise<Workspace[]> {
-  const { data, error } = await supabase
+  const client = requireSupabase();
+  const { data, error } = await client
     .from('workspaces')
     .select('*')
     .eq('user_id', userId)
@@ -148,7 +159,8 @@ export async function createWorkspace(
   userId: string,
   name: string
 ): Promise<Workspace> {
-  const { data, error } = await supabase
+  const client = requireSupabase();
+  const { data, error } = await client
     .from('workspaces')
     .insert({
       user_id: userId,
@@ -169,7 +181,8 @@ export async function renameWorkspace(
   workspaceId: string,
   name: string
 ): Promise<void> {
-  const { error } = await supabase
+  const client = requireSupabase();
+  const { error } = await client
     .from('workspaces')
     .update({ name })
     .eq('id', workspaceId);
@@ -178,7 +191,8 @@ export async function renameWorkspace(
 }
 
 export async function deleteWorkspace(workspaceId: string): Promise<void> {
-  const { error } = await supabase
+  const client = requireSupabase();
+  const { error } = await client
     .from('workspaces')
     .delete()
     .eq('id', workspaceId);
