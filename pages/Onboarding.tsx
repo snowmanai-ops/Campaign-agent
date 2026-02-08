@@ -642,7 +642,7 @@ export const Onboarding: React.FC = () => {
           onClick={() => fileInputRef.current?.click()}
         >
           <UploadCloud size={40} className={`transition-colors duration-200 ${isDragOver ? 'text-indigo-400' : 'text-gray-300'}`} />
-          <p className={`font-medium text-base mt-4 transition-colors duration-200 ${isDragOver ? 'text-indigo-600' : 'text-gray-500'}`}>
+          <p className={`font-medium text-base mt-4 text-center transition-colors duration-200 ${isDragOver ? 'text-indigo-600' : 'text-gray-500'}`}>
             {isDragOver ? 'Drop files here' : 'Drag & drop your files here (e.g. brand guides, product pages, past campaigns)'}
           </p>
           <p className="text-gray-400 text-sm mt-1">
