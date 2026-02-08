@@ -38,31 +38,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [isPremium, setIsPremium] = useState(false);
 
-  const fetchProfile = useCallback(async (userId: string) => {
-    if (!supabase) return null;
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
+  const fetchAndSetProfile = useCallback(async (userId: string) => {
+    if (!supabase) return;
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
 
-    if (error) {
-      console.error('Error fetching profile:', error);
-      return null;
+      if (error) {
+        console.warn('Profile not found (may not exist yet):', error.message);
+        return;
+      }
+      const prof = data as UserProfile;
+      setProfile(prof);
+      setIsPremium(prof.subscription_status === 'premium');
+    } catch (err) {
+      console.error('Failed to fetch profile:', err);
     }
-    return data as UserProfile;
-  }, []);
-
-  const updateState = useCallback((
-    newUser: User | null,
-    newSession: Session | null,
-    newProfile: UserProfile | null
-  ) => {
-    setUser(newUser);
-    setSession(newSession);
-    setProfile(newProfile);
-    setIsPremium(newProfile?.subscription_status === 'premium');
-    setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -71,28 +65,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    // Read session from storage — fast, no DB call
+    supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
-        const prof = await fetchProfile(session.user.id);
-        updateState(session.user, session, prof);
-      } else {
-        setLoading(false);
+        setUser(session.user);
+        setSession(session);
+        // Fetch profile in background — don't block loading
+        fetchAndSetProfile(session.user.id);
       }
+      setLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      (_event, session) => {
         if (session?.user) {
-          const prof = await fetchProfile(session.user.id);
-          updateState(session.user, session, prof);
+          setUser(session.user);
+          setSession(session);
+          fetchAndSetProfile(session.user.id);
         } else {
-          updateState(null, null, null);
+          setUser(null);
+          setSession(null);
+          setProfile(null);
+          setIsPremium(false);
         }
       }
     );
 
     return () => subscription.unsubscribe();
-  }, [fetchProfile, updateState]);
+  }, [fetchAndSetProfile]);
 
   const signInWithGoogle = useCallback(async () => {
     if (!supabase) throw new Error('Authentication is not configured');
