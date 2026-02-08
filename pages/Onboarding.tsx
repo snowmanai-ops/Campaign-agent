@@ -51,6 +51,8 @@ export const Onboarding: React.FC = () => {
   useEffect(() => {
     if (userContext) {
       setAnalyzedData(userContext);
+    } else {
+      setAnalyzedData(null);
     }
   }, [userContext]);
 

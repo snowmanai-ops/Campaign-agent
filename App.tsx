@@ -292,6 +292,12 @@ const AppInner: React.FC = () => {
       saveWorkspaceContext(activeWorkspaceId, newContext).catch((err) =>
         console.error('Failed to save context to Supabase:', err)
       );
+      // Keep local workspaces array in sync so switchWorkspace uses fresh data
+      setWorkspaces(prev => prev.map(w =>
+        w.id === activeWorkspaceId
+          ? { ...w, brand_context: newContext.brand, audience_context: newContext.audience, offer_context: newContext.offer }
+          : w
+      ));
     }
   }, [user, activeWorkspaceId]);
 
