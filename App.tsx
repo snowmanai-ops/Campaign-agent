@@ -123,6 +123,7 @@ const AppInner: React.FC = () => {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null);
   const loadedForUserId = useRef<string | null>(null);
+  const userId = user?.id || null;
 
   // Hard safety timeout — never stay loading forever (independent of effect lifecycle)
   useEffect(() => {
@@ -153,8 +154,6 @@ const AppInner: React.FC = () => {
   }, []);
 
   // Load data: from Supabase if logged in, from sessionStorage if anonymous
-  // Uses user.id (stable string) to avoid re-running when user object reference changes
-  const userId = user?.id || null;
   useEffect(() => {
     console.log('[App] Data effect:', { authLoading, userId, loadedFor: loadedForUserId.current });
     if (authLoading) {
