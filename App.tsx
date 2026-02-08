@@ -98,11 +98,21 @@ export const useAppStore = () => {
   return context;
 };
 
-const LoadingScreen = () => (
-  <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-    <Loader2 size={32} className="animate-spin text-indigo-500" />
-  </div>
-);
+const LoadingScreen = () => {
+  const [showHint, setShowHint] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setShowHint(true), 4000);
+    return () => clearTimeout(timer);
+  }, []);
+  return (
+    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-3">
+      <Loader2 size={32} className="animate-spin text-indigo-500" />
+      {showHint && (
+        <p className="text-sm text-gray-400">Taking longer than expected...</p>
+      )}
+    </div>
+  );
+};
 
 // Inner component that has access to auth context
 const AppInner: React.FC = () => {
@@ -113,6 +123,16 @@ const AppInner: React.FC = () => {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null);
   const loadedForUserId = useRef<string | null>(null);
+
+  // Hard safety timeout — never stay loading forever (independent of effect lifecycle)
+  useEffect(() => {
+    if (!dataLoading) return;
+    const timer = setTimeout(() => {
+      console.warn('[App] Force-ending loading after 10s. authLoading:', authLoading, 'userId:', userId);
+      setDataLoading(false);
+    }, 10000);
+    return () => clearTimeout(timer);
+  }, [dataLoading, authLoading, userId]);
 
   // Keep apiService auth state in sync with current session + workspace
   useEffect(() => {
@@ -136,28 +156,41 @@ const AppInner: React.FC = () => {
   // Uses user.id (stable string) to avoid re-running when user object reference changes
   const userId = user?.id || null;
   useEffect(() => {
-    if (authLoading) return;
+    console.log('[App] Data effect:', { authLoading, userId, loadedFor: loadedForUserId.current });
+    if (authLoading) {
+      console.log('[App] Auth still loading, skipping data load');
+      return;
+    }
 
     if (userId) {
       // Already loaded for this user — skip
-      if (loadedForUserId.current === userId) return;
+      if (loadedForUserId.current === userId) {
+        console.log('[App] Already loaded for this user, skipping');
+        return;
+      }
       loadedForUserId.current = userId;
 
       setDataLoading(true);
+      console.log('[App] Starting Supabase data load for user:', userId);
 
       (async () => {
         try {
+          console.log('[App] Creating/getting default workspace...');
           await getOrCreateDefaultWorkspace(userId);
+          console.log('[App] Loading workspaces...');
           const allWorkspaces = await listWorkspaces(userId);
+          console.log('[App] Got workspaces:', allWorkspaces.length);
           setWorkspaces(allWorkspaces);
 
           const defaultWs = allWorkspaces.find(w => w.is_default) || allWorkspaces[0];
           if (defaultWs) {
+            console.log('[App] Loading workspace data for:', defaultWs.name);
             await loadWorkspaceData(userId, defaultWs);
           }
         } catch (err) {
-          console.error('Failed to load from Supabase:', err);
+          console.error('[App] Failed to load from Supabase:', err);
         }
+        console.log('[App] Data loading complete');
         setDataLoading(false);
       })();
     } else {
