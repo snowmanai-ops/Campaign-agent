@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Loader2 } from 'lucide-react';
 import { Onboarding } from './pages/Onboarding';
 import { Dashboard } from './pages/Dashboard';
 import { CampaignBuilder } from './pages/CampaignBuilder';
@@ -97,6 +98,12 @@ export const useAppStore = () => {
   return context;
 };
 
+const LoadingScreen = () => (
+  <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+    <Loader2 size={32} className="animate-spin text-indigo-500" />
+  </div>
+);
+
 // Inner component that has access to auth context
 const AppInner: React.FC = () => {
   const { user, session, loading: authLoading } = useAuthContext();
@@ -130,7 +137,20 @@ const AppInner: React.FC = () => {
     if (authLoading) return;
 
     if (user) {
+      // Skip re-loading if we already loaded for this user
+      if (initialLoadDone.current) return;
+
       setDataLoading(true);
+
+      // Safety timeout — if Supabase queries hang (e.g. RLS misconfiguration), don't stay blank forever
+      const timeout = setTimeout(() => {
+        if (!initialLoadDone.current) {
+          console.warn('Data loading timed out — Supabase queries may be blocked by RLS policies');
+          initialLoadDone.current = true;
+          setDataLoading(false);
+        }
+      }, 8000);
+
       (async () => {
         try {
           // Ensure default workspace exists, then load all workspaces
@@ -146,9 +166,12 @@ const AppInner: React.FC = () => {
         } catch (err) {
           console.error('Failed to load from Supabase:', err);
         }
+        clearTimeout(timeout);
         initialLoadDone.current = true;
         setDataLoading(false);
       })();
+
+      return () => clearTimeout(timeout);
     } else {
       // Anonymous: load from sessionStorage
       localStorage.removeItem('emailAgentApiKey');
@@ -305,22 +328,22 @@ const AppInner: React.FC = () => {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={
-            dataLoading ? null :
+            dataLoading ? <LoadingScreen /> :
             context ? <Navigate to="/dashboard" /> : <Navigate to="/onboarding" />
           } />
           <Route path="/login" element={<Login />} />
           <Route path="/upgrade-success" element={<UpgradeSuccess />} />
           <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/dashboard" element={
-            dataLoading ? null :
+            dataLoading ? <LoadingScreen /> :
             context ? <Dashboard /> : <Navigate to="/onboarding" />
           } />
           <Route path="/campaigns/new" element={
-            dataLoading ? null :
+            dataLoading ? <LoadingScreen /> :
             context ? <CampaignBuilder /> : <Navigate to="/onboarding" />
           } />
           <Route path="/campaigns/:id" element={
-            dataLoading ? null :
+            dataLoading ? <LoadingScreen /> :
             context ? <CampaignView /> : <Navigate to="/onboarding" />
           } />
         </Routes>
