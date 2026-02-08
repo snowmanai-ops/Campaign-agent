@@ -12,9 +12,9 @@ export default defineConfig(({ mode }) => {
       },
       plugins: [react()],
       define: {
-        'process.env.API_URL': JSON.stringify(env.VITE_API_URL || 'http://localhost:8000'),
-        'process.env.SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL || ''),
-        'process.env.SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY || ''),
+        'process.env.API_URL': JSON.stringify(env.VITE_API_URL || process.env.VITE_API_URL || 'http://localhost:8000'),
+        'process.env.SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL || process.env.VITE_SUPABASE_URL || ''),
+        'process.env.SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || ''),
       },
       resolve: {
         alias: {
