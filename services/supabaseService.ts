@@ -112,15 +112,22 @@ export async function saveWorkspaceContext(
 }
 
 export function workspaceToContext(workspace: Workspace): FullContext | null {
-  // If workspace has no context data yet, return null
-  if (!workspace.brand_context?.name && !workspace.audience_context?.jobTitles?.length) {
-    return null;
-  }
+  const b = workspace.brand_context;
+  const a = workspace.audience_context;
+  const o = workspace.offer_context;
+
+  // Check if ANY section has meaningful data
+  const hasData =
+    b?.name || b?.tagline || b?.mission ||
+    a?.jobTitles?.length || a?.industries?.length || a?.description ||
+    o?.name || o?.pitch || o?.usp;
+
+  if (!hasData) return null;
 
   return {
-    brand: workspace.brand_context || {},
-    audience: workspace.audience_context || {},
-    offer: workspace.offer_context || {},
+    brand: b || {},
+    audience: a || {},
+    offer: o || {},
     isComplete: true,
   };
 }

@@ -36,7 +36,9 @@ export const Onboarding: React.FC = () => {
   } = useAppStore();
 
   const canSkipOnboarding = workspaces.some(ws =>
-    ws.brand_context?.name || ws.audience_context?.jobTitles?.length
+    ws.brand_context?.name || ws.brand_context?.tagline || ws.brand_context?.mission ||
+    ws.audience_context?.jobTitles?.length || ws.audience_context?.industries?.length ||
+    ws.offer_context?.name || ws.offer_context?.pitch || ws.offer_context?.usp
   );
   const [sources, setSources] = useState<Source[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -220,11 +222,20 @@ export const Onboarding: React.FC = () => {
     runAnalysis();
   };
 
-  const handleConfirm = () => {
-    if (analyzedData) {
-      setContext(analyzedData);
-      saveContext(analyzedData).catch(console.error);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleConfirm = async () => {
+    if (!analyzedData) return;
+    setIsSaving(true);
+    try {
+      await setContext(analyzedData);
+      saveContext(analyzedData).catch(console.error); // Backend save (non-critical)
       navigate('/dashboard');
+    } catch (err) {
+      console.error('Failed to save context:', err);
+      alert('Failed to save your brand context. Please try again.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -258,7 +269,9 @@ export const Onboarding: React.FC = () => {
     setAnalyzedData(updated);
     // Also persist to global state if user came from dashboard
     if (userContext) {
-      setContext(updated);
+      setContext(updated).catch((err) =>
+        console.error('Failed to save context edit:', err)
+      );
     }
     setEditingCard(null);
     setEditDraft(null);
@@ -549,8 +562,8 @@ export const Onboarding: React.FC = () => {
             <Button variant="outline" size="lg" onClick={() => setAnalyzedData(null)}>
                 Re-analyze Sources
             </Button>
-            <Button onClick={handleConfirm} size="lg" className="px-8 shadow-lg shadow-indigo-200">
-                Save & Go to Dashboard <ArrowRight size={18} className="ml-2" />
+            <Button onClick={handleConfirm} size="lg" className="px-8 shadow-lg shadow-indigo-200" disabled={isSaving} isLoading={isSaving}>
+                {isSaving ? 'Saving...' : 'Save & Go to Dashboard'} {!isSaving && <ArrowRight size={18} className="ml-2" />}
             </Button>
         </div>
 

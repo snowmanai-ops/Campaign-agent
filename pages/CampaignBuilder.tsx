@@ -59,6 +59,16 @@ export const CampaignBuilder: React.FC = () => {
     return () => clearInterval(interval);
   }, [isGenerating]);
 
+  // Prevent accidental page close/reload during generation
+  useEffect(() => {
+    if (!isGenerating) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isGenerating]);
+
   const handleCreate = async () => {
     if (!selectedGoal || !userContext) return;
     

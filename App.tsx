@@ -77,7 +77,7 @@ function migrateContext(ctx: any): FullContext {
 
 // --- State Management ---
 interface AppContextType extends UserState {
-  setContext: (context: FullContext) => void;
+  setContext: (context: FullContext) => Promise<void>;
   addCampaign: (campaign: Campaign) => void;
   updateCampaign: (id: string, updates: Partial<Campaign>) => void;
   deleteCampaign: (id: string) => void;
@@ -289,13 +289,12 @@ const AppInner: React.FC = () => {
 
   // --- Data actions ---
 
-  const setContext = useCallback((newContext: FullContext) => {
+  const setContext = useCallback(async (newContext: FullContext): Promise<void> => {
     setContextState(newContext);
 
     if (user && activeWorkspaceId) {
-      saveWorkspaceContext(activeWorkspaceId, newContext).catch((err) =>
-        console.error('Failed to save context to Supabase:', err)
-      );
+      // Await the save — callers can catch errors
+      await saveWorkspaceContext(activeWorkspaceId, newContext);
       // Keep local workspaces array in sync so switchWorkspace uses fresh data
       setWorkspaces(prev => prev.map(w =>
         w.id === activeWorkspaceId
