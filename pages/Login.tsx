@@ -121,7 +121,7 @@ export const Login: React.FC = () => {
           {/* Price */}
           <div className="text-center mb-6 p-4 rounded-xl bg-indigo-50 border border-indigo-100">
             <div className="flex items-baseline justify-center gap-1">
-              <span className="text-3xl font-bold text-gray-900">$29</span>
+              <span className="text-3xl font-bold text-gray-900">$5</span>
               <span className="text-gray-500 text-sm">/month</span>
             </div>
             <p className="text-xs text-indigo-600 mt-1 font-medium">Cancel anytime</p>
@@ -159,7 +159,7 @@ export const Login: React.FC = () => {
               size="lg"
               className="w-full"
             >
-              Subscribe — $29/month
+              Subscribe — $5/month
             </Button>
           ) : (
             // Not signed in — show Google sign in
