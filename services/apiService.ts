@@ -20,16 +20,10 @@ function parseEmailBody(body: any): string {
   return "";
 }
 
-/** Build common headers including the user's API key */
+/** Build common headers for API requests */
 function getHeaders(contentType = true): Record<string, string> {
   const headers: Record<string, string> = {};
   if (contentType) headers["Content-Type"] = "application/json";
-
-  const apiKey = localStorage.getItem('emailAgentApiKey');
-  const provider = localStorage.getItem('emailAgentApiProvider');
-  if (apiKey) headers["X-API-Key"] = apiKey;
-  if (provider) headers["X-API-Provider"] = provider;
-
   return headers;
 }
 

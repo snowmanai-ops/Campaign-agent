@@ -4,7 +4,6 @@ import { Onboarding } from './pages/Onboarding';
 import { Dashboard } from './pages/Dashboard';
 import { CampaignBuilder } from './pages/CampaignBuilder';
 import { CampaignView } from './pages/CampaignView';
-import { ApiKeySetup } from './pages/ApiKeySetup';
 import { FullContext, Campaign, UserState } from './types';
 import { buildAudienceDescription } from './utils';
 
@@ -63,10 +62,6 @@ interface AppContextType extends UserState {
   addCampaign: (campaign: Campaign) => void;
   updateCampaign: (id: string, updates: Partial<Campaign>) => void;
   deleteCampaign: (id: string) => void;
-  apiKey: string | null;
-  apiProvider: 'openai' | 'anthropic' | null;
-  setApiKey: (provider: 'openai' | 'anthropic', key: string) => void;
-  clearApiKey: () => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -80,27 +75,25 @@ export const useAppStore = () => {
 const App: React.FC = () => {
   const [context, setContextState] = useState<FullContext | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [apiKey, setApiKeyState] = useState<string | null>(null);
-  const [apiProvider, setApiProviderState] = useState<'openai' | 'anthropic' | null>(null);
 
-  // Load from local storage on mount (with migration for old format)
+  // Load from session storage on mount (with migration for old format)
   useEffect(() => {
-    const saved = localStorage.getItem('emailAgentState');
+    // Clean up stale localStorage keys from previous versions
+    localStorage.removeItem('emailAgentApiKey');
+    localStorage.removeItem('emailAgentApiProvider');
+    localStorage.removeItem('emailAgentState');
+
+    const saved = sessionStorage.getItem('emailAgentState');
     if (saved) {
       const parsed = JSON.parse(saved);
       if (parsed.context) setContextState(migrateContext(parsed.context));
       if (parsed.campaigns) setCampaigns(parsed.campaigns);
     }
-    // Load API key separately (more secure than bundling with other state)
-    const savedKey = localStorage.getItem('emailAgentApiKey');
-    const savedProvider = localStorage.getItem('emailAgentApiProvider') as 'openai' | 'anthropic' | null;
-    if (savedKey) setApiKeyState(savedKey);
-    if (savedProvider) setApiProviderState(savedProvider);
   }, []);
 
-  // Save to local storage on change
+  // Save to session storage on change
   useEffect(() => {
-    localStorage.setItem('emailAgentState', JSON.stringify({ context, campaigns }));
+    sessionStorage.setItem('emailAgentState', JSON.stringify({ context, campaigns }));
   }, [context, campaigns]);
 
   const setContext = (newContext: FullContext) => {
@@ -119,22 +112,6 @@ const App: React.FC = () => {
     setCampaigns(prev => prev.filter(c => c.id !== id));
   };
 
-  const setApiKey = (provider: 'openai' | 'anthropic', key: string) => {
-    setApiKeyState(key);
-    setApiProviderState(provider);
-    localStorage.setItem('emailAgentApiKey', key);
-    localStorage.setItem('emailAgentApiProvider', provider);
-  };
-
-  const clearApiKey = () => {
-    setApiKeyState(null);
-    setApiProviderState(null);
-    localStorage.removeItem('emailAgentApiKey');
-    localStorage.removeItem('emailAgentApiProvider');
-  };
-
-  const hasApiKey = !!apiKey;
-
   return (
     <AppContext.Provider value={{
       context: context!,
@@ -144,34 +121,20 @@ const App: React.FC = () => {
       addCampaign,
       updateCampaign,
       deleteCampaign,
-      apiKey,
-      apiProvider,
-      setApiKey,
-      clearApiKey,
-    } as any}>
+    }}>
       <HashRouter>
         <Routes>
-          <Route path="/setup" element={
-            <ApiKeySetup
-              onSave={(provider, key) => setApiKey(provider, key)}
-              existingProvider={apiProvider}
-              existingKey={apiKey}
-            />
-          } />
           <Route path="/" element={
             context ? <Navigate to="/dashboard" /> : <Navigate to="/onboarding" />
           } />
           <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/dashboard" element={
-            !hasApiKey ? <Navigate to="/setup" /> :
             context ? <Dashboard /> : <Navigate to="/onboarding" />
           } />
           <Route path="/campaigns/new" element={
-            !hasApiKey ? <Navigate to="/setup" /> :
             context ? <CampaignBuilder /> : <Navigate to="/onboarding" />
           } />
           <Route path="/campaigns/:id" element={
-            !hasApiKey ? <Navigate to="/setup" /> :
             context ? <CampaignView /> : <Navigate to="/onboarding" />
           } />
         </Routes>
