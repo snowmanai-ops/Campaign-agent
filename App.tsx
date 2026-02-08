@@ -112,7 +112,7 @@ const AppInner: React.FC = () => {
   const [dataLoading, setDataLoading] = useState(true);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null);
-  const initialLoadDone = useRef(false);
+  const loadedForUserId = useRef<string | null>(null);
 
   // Keep apiService auth state in sync with current session + workspace
   useEffect(() => {
@@ -133,47 +133,36 @@ const AppInner: React.FC = () => {
   }, []);
 
   // Load data: from Supabase if logged in, from sessionStorage if anonymous
+  // Uses user.id (stable string) to avoid re-running when user object reference changes
+  const userId = user?.id || null;
   useEffect(() => {
     if (authLoading) return;
 
-    if (user) {
-      // Skip re-loading if we already loaded for this user
-      if (initialLoadDone.current) return;
+    if (userId) {
+      // Already loaded for this user — skip
+      if (loadedForUserId.current === userId) return;
+      loadedForUserId.current = userId;
 
       setDataLoading(true);
 
-      // Safety timeout — if Supabase queries hang (e.g. RLS misconfiguration), don't stay blank forever
-      const timeout = setTimeout(() => {
-        if (!initialLoadDone.current) {
-          console.warn('Data loading timed out — Supabase queries may be blocked by RLS policies');
-          initialLoadDone.current = true;
-          setDataLoading(false);
-        }
-      }, 8000);
-
       (async () => {
         try {
-          // Ensure default workspace exists, then load all workspaces
-          await getOrCreateDefaultWorkspace(user.id);
-          const allWorkspaces = await listWorkspaces(user.id);
+          await getOrCreateDefaultWorkspace(userId);
+          const allWorkspaces = await listWorkspaces(userId);
           setWorkspaces(allWorkspaces);
 
-          // Load the default workspace's data
           const defaultWs = allWorkspaces.find(w => w.is_default) || allWorkspaces[0];
           if (defaultWs) {
-            await loadWorkspaceData(user.id, defaultWs);
+            await loadWorkspaceData(userId, defaultWs);
           }
         } catch (err) {
           console.error('Failed to load from Supabase:', err);
         }
-        clearTimeout(timeout);
-        initialLoadDone.current = true;
         setDataLoading(false);
       })();
-
-      return () => clearTimeout(timeout);
     } else {
       // Anonymous: load from sessionStorage
+      loadedForUserId.current = null;
       localStorage.removeItem('emailAgentApiKey');
       localStorage.removeItem('emailAgentApiProvider');
       localStorage.removeItem('emailAgentState');
@@ -190,18 +179,16 @@ const AppInner: React.FC = () => {
       }
       setWorkspaces([]);
       setActiveWorkspaceId(null);
-      initialLoadDone.current = true;
       setDataLoading(false);
     }
-  }, [user, authLoading, loadWorkspaceData]);
+  }, [userId, authLoading, loadWorkspaceData]);
 
   // Save to sessionStorage for anonymous users
   useEffect(() => {
-    if (!initialLoadDone.current) return;
-    if (!user) {
+    if (!loadedForUserId.current && !userId) {
       sessionStorage.setItem('emailAgentState', JSON.stringify({ context, campaigns }));
     }
-  }, [context, campaigns, user]);
+  }, [context, campaigns, userId]);
 
   // --- Workspace actions ---
 
