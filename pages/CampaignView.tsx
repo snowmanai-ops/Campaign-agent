@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, Navigate } from 'react-router-dom';
 import { ArrowLeft, Save, GripVertical, Trash2, Copy, Download, Calendar, CheckCircle2, Circle, Clock, Mail } from 'lucide-react';
 import { useAppStore } from '../App';
 import { Button, Card, Input, Textarea, Badge } from '../components/ui';
@@ -13,7 +13,7 @@ export const CampaignView: React.FC = () => {
 
   const campaign = campaigns.find(c => c.id === id);
   
-  if (!campaign) return <div>Campaign not found</div>;
+  if (!campaign) return <Navigate to="/dashboard" replace />;
 
   const activeEmail = campaign.emails.find(e => e.id === activeEmailId);
 

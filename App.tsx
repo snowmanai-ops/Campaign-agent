@@ -124,13 +124,13 @@ const AppInner: React.FC = () => {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null);
   const loadedForUserId = useRef<string | null>(null);
+  const switchingRef = useRef(false);
   const userId = user?.id || null;
 
   // Hard safety timeout — never stay loading forever (independent of effect lifecycle)
   useEffect(() => {
     if (!dataLoading) return;
     const timer = setTimeout(() => {
-      console.warn('[App] Force-ending loading after 10s. authLoading:', authLoading, 'userId:', userId);
       setDataLoading(false);
     }, 10000);
     return () => clearTimeout(timer);
@@ -156,43 +156,29 @@ const AppInner: React.FC = () => {
 
   // Load data: from Supabase if logged in, from sessionStorage if anonymous
   useEffect(() => {
-    console.log('[App] Data effect:', { authLoading, userId, loadedFor: loadedForUserId.current });
-    if (authLoading) {
-      console.log('[App] Auth still loading, skipping data load');
-      return;
-    }
+    if (authLoading) return;
 
     if (userId) {
       // Already loaded for this user — skip
-      if (loadedForUserId.current === userId) {
-        console.log('[App] Already loaded for this user, skipping');
-        return;
-      }
+      if (loadedForUserId.current === userId) return;
       loadedForUserId.current = userId;
 
       setDataLoading(true);
-      console.log('[App] Starting Supabase data load for user:', userId);
 
       (async () => {
         try {
-          console.log('[App] Creating/getting default workspace...');
           await getOrCreateDefaultWorkspace(userId);
-          console.log('[App] Cleaning up duplicate defaults...');
           await cleanupDuplicateDefaultWorkspaces(userId);
-          console.log('[App] Loading workspaces...');
           const allWorkspaces = await listWorkspaces(userId);
-          console.log('[App] Got workspaces:', allWorkspaces.length);
           setWorkspaces(allWorkspaces);
 
           const defaultWs = allWorkspaces.find(w => w.is_default) || allWorkspaces[0];
           if (defaultWs) {
-            console.log('[App] Loading workspace data for:', defaultWs.name);
             await loadWorkspaceData(userId, defaultWs);
           }
         } catch (err) {
-          console.error('[App] Failed to load from Supabase:', err);
+          console.error('Failed to load from Supabase:', err);
         }
-        console.log('[App] Data loading complete');
         setDataLoading(false);
       })();
     } else {
@@ -228,32 +214,47 @@ const AppInner: React.FC = () => {
   // --- Workspace actions ---
 
   const switchWorkspace = useCallback(async (workspaceId: string) => {
-    if (!user || workspaceId === activeWorkspaceId) return;
-    setDataLoading(true);
+    if (!user || workspaceId === activeWorkspaceId || switchingRef.current) return;
+    switchingRef.current = true;
+
     try {
-      const ws = workspaces.find(w => w.id === workspaceId);
-      if (ws) {
-        await loadWorkspaceData(user.id, ws);
-      }
+      // Fetch fresh workspace list from Supabase (not stale local copy)
+      const freshWorkspaces = await listWorkspaces(user.id);
+      setWorkspaces(freshWorkspaces);
+
+      const ws = freshWorkspaces.find(w => w.id === workspaceId);
+      if (!ws) return;
+
+      // Pre-fetch campaigns BEFORE touching any state
+      const camps = await loadCampaigns(user.id, ws.id);
+
+      // Build context from fresh workspace data
+      const ctx = workspaceToContext(ws);
+
+      // All setState calls in same synchronous block → React 18 batches into 1 re-render
+      setContextState(ctx ? migrateContext(ctx) : null);
+      setCampaigns(camps);
+      setActiveWorkspaceId(ws.id);
     } catch (err) {
       console.error('Failed to switch workspace:', err);
+    } finally {
+      switchingRef.current = false;
     }
-    setDataLoading(false);
-  }, [user, activeWorkspaceId, workspaces, loadWorkspaceData]);
+  }, [user, activeWorkspaceId]);
 
   const handleCreateWorkspace = useCallback(async (name: string) => {
     if (!user) return;
     try {
       const newWs = await createWorkspace(user.id, name);
       setWorkspaces(prev => [...prev, newWs]);
-      // Switch to the new workspace
-      setDataLoading(true);
-      await loadWorkspaceData(user.id, newWs);
-      setDataLoading(false);
+      // New workspace = no context, no campaigns — batch state updates
+      setContextState(null);
+      setCampaigns([]);
+      setActiveWorkspaceId(newWs.id);
     } catch (err) {
       console.error('Failed to create workspace:', err);
     }
-  }, [user, loadWorkspaceData]);
+  }, [user]);
 
   const handleRenameWorkspace = useCallback(async (workspaceId: string, name: string) => {
     try {
@@ -274,14 +275,17 @@ const AppInner: React.FC = () => {
       // If we deleted the active workspace, switch to default
       if (workspaceId === activeWorkspaceId && remaining.length > 0) {
         const defaultWs = remaining.find(w => w.is_default) || remaining[0];
-        setDataLoading(true);
-        await loadWorkspaceData(user.id, defaultWs);
-        setDataLoading(false);
+        const camps = await loadCampaigns(user.id, defaultWs.id);
+        const ctx = workspaceToContext(defaultWs);
+        // Batch state updates
+        setContextState(ctx ? migrateContext(ctx) : null);
+        setCampaigns(camps);
+        setActiveWorkspaceId(defaultWs.id);
       }
     } catch (err) {
       console.error('Failed to delete workspace:', err);
     }
-  }, [user, workspaces, activeWorkspaceId, loadWorkspaceData]);
+  }, [user, workspaces, activeWorkspaceId]);
 
   // --- Data actions ---
 
