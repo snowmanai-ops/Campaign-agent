@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Onboarding } from './pages/Onboarding';
 import { Dashboard } from './pages/Dashboard';
 import { CampaignBuilder } from './pages/CampaignBuilder';
@@ -302,7 +302,7 @@ const AppInner: React.FC = () => {
       handleRenameWorkspace,
       handleDeleteWorkspace,
     }}>
-      <HashRouter>
+      <BrowserRouter>
         <Routes>
           <Route path="/" element={
             dataLoading ? null :
@@ -324,7 +324,7 @@ const AppInner: React.FC = () => {
             context ? <CampaignView /> : <Navigate to="/onboarding" />
           } />
         </Routes>
-      </HashRouter>
+      </BrowserRouter>
     </AppContext.Provider>
   );
 };
