@@ -398,17 +398,12 @@
        JAVASCRIPT — Form handling & ConvertKit API
        ============================================ -->
   <script>
-    // === CONFIGURATION (UPDATE THESE) ===
-    const CONVERTKIT_FORM_ID = '9065010';
-    const CONVERTKIT_API_KEY = 'kit_b64597ccba60990044ff5df8f89039ba';
-    const TAG_LEAD = '15728407';       // ConvertKit tag ID for "Business Owner"
-    const TAG_STUDENT = '15728408';  // ConvertKit tag ID for "Builder"
+    // === CONFIGURATION ===
+    const KIT_FORM_ID = '9065010';
+    const KIT_API_KEY = 'kit_b64597ccba60990044ff5df8f89039ba';
+    const TAG_LEAD = '15728407';       // Kit tag ID for "Business Owner"
+    const TAG_STUDENT = '15728408';  // Kit tag ID for "Builder"
     const REDIRECT_URL = './index.html#/onboarding?ref=optin';
-
-    // Warn if not configured
-    if (CONVERTKIT_FORM_ID.includes('YOUR_') || CONVERTKIT_API_KEY.includes('YOUR_')) {
-      console.warn('[Campaign Agent Opt-in] ConvertKit credentials not configured. Update the CONFIGURATION section in optin.html.');
-    }
 
     // === STATE ===
     let capturedEmail = '';
@@ -451,36 +446,50 @@
     optionLead.addEventListener('click', () => submitWithTag(TAG_LEAD, optionLead));
     optionStudent.addEventListener('click', () => submitWithTag(TAG_STUDENT, optionStudent));
 
+    const kitHeaders = {
+      'Content-Type': 'application/json',
+      'X-Kit-Api-Key': KIT_API_KEY,
+    };
+
     async function submitWithTag(tagId, clickedBtn) {
       hideError(step2ErrorMsg);
       setOptionsLoading(true, clickedBtn);
 
       try {
-        const response = await fetch(
-          `https://api.convertkit.com/v3/forms/${CONVERTKIT_FORM_ID}/subscribe`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              api_key: CONVERTKIT_API_KEY,
-              email: capturedEmail,
-              tags: [tagId],
-            }),
-          }
-        );
-
-        if (!response.ok) {
-          const data = await response.json().catch(() => ({}));
+        // Step 1: Create subscriber
+        const createRes = await fetch('https://api.kit.com/v4/subscribers', {
+          method: 'POST',
+          headers: kitHeaders,
+          body: JSON.stringify({ email_address: capturedEmail }),
+        });
+        if (!createRes.ok) {
+          const data = await createRes.json().catch(() => ({}));
           throw new Error(data.message || 'Subscription failed. Please try again.');
         }
 
-        const data = await response.json();
-
-        if (data.subscription) {
-          window.location.href = REDIRECT_URL;
-        } else {
-          throw new Error('Unexpected response. Please try again.');
+        // Step 2: Add subscriber to form
+        const formRes = await fetch(`https://api.kit.com/v4/forms/${KIT_FORM_ID}/subscribers`, {
+          method: 'POST',
+          headers: kitHeaders,
+          body: JSON.stringify({ email_address: capturedEmail }),
+        });
+        if (!formRes.ok) {
+          const data = await formRes.json().catch(() => ({}));
+          throw new Error(data.message || 'Could not add to form. Please try again.');
         }
+
+        // Step 3: Tag subscriber
+        const tagRes = await fetch(`https://api.kit.com/v4/tags/${tagId}/subscribers`, {
+          method: 'POST',
+          headers: kitHeaders,
+          body: JSON.stringify({ email_address: capturedEmail }),
+        });
+        if (!tagRes.ok) {
+          const data = await tagRes.json().catch(() => ({}));
+          throw new Error(data.message || 'Could not apply tag. Please try again.');
+        }
+
+        window.location.href = REDIRECT_URL;
       } catch (err) {
         showError(step2ErrorMsg, err.message || 'Something went wrong. Please try again.');
         setOptionsLoading(false, null);
