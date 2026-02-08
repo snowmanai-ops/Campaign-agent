@@ -643,7 +643,10 @@ export const Onboarding: React.FC = () => {
         >
           <UploadCloud size={40} className={`transition-colors duration-200 ${isDragOver ? 'text-indigo-400' : 'text-gray-300'}`} />
           <p className={`font-medium text-base mt-4 text-center transition-colors duration-200 ${isDragOver ? 'text-indigo-600' : 'text-gray-500'}`}>
-            {isDragOver ? 'Drop files here' : 'Drag & drop your files here (e.g. brand guides, product pages, past campaigns)'}
+            {isDragOver ? 'Drop files here' : 'Drag & drop your files here'}
+          </p>
+          <p className="text-gray-400 text-sm mt-1">
+            e.g. brand guides, product pages, past campaigns
           </p>
           <p className="text-gray-400 text-sm mt-1">
             pdf, docx, txt, md, csv
