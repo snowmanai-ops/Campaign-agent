@@ -3,10 +3,22 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Plus, Mail, BarChart3, ArrowRight, Settings, Trash2 } from 'lucide-react';
 import { useAppStore } from '../App';
 import { Card, Button, Badge } from '../components/ui';
+import { UserMenu } from '../components/UserMenu';
+import { WorkspaceSwitcher } from '../components/WorkspaceSwitcher';
 
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
-  const { campaigns, userContext, deleteCampaign } = useAppStore();
+  const {
+    campaigns,
+    userContext,
+    deleteCampaign,
+    workspaces,
+    activeWorkspaceId,
+    switchWorkspace,
+    handleCreateWorkspace,
+    handleRenameWorkspace,
+    handleDeleteWorkspace,
+  } = useAppStore();
 
   const totalEmails = campaigns.reduce((acc, c) => acc + c.emails.length, 0);
 
@@ -25,7 +37,15 @@ export const Dashboard: React.FC = () => {
           <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Dashboard</h1>
           <p className="text-gray-500 mt-1">Manage your email campaigns and brand settings.</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-3 items-center">
+          <WorkspaceSwitcher
+            workspaces={workspaces}
+            activeWorkspaceId={activeWorkspaceId}
+            onSwitch={switchWorkspace}
+            onCreate={handleCreateWorkspace}
+            onRename={handleRenameWorkspace}
+            onDelete={handleDeleteWorkspace}
+          />
           <Link to="/onboarding">
             <Button variant="outline" className="gap-2">
               <Settings size={18} /> Context
@@ -36,6 +56,7 @@ export const Dashboard: React.FC = () => {
               <Plus size={18} /> New Campaign
             </Button>
           </Link>
+          <UserMenu />
         </div>
       </header>
 

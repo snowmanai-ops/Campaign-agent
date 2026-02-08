@@ -1,11 +1,27 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Onboarding } from './pages/Onboarding';
 import { Dashboard } from './pages/Dashboard';
 import { CampaignBuilder } from './pages/CampaignBuilder';
 import { CampaignView } from './pages/CampaignView';
+import { Login } from './pages/Login';
+import { UpgradeSuccess } from './pages/UpgradeSuccess';
+import { AuthProvider, useAuthContext } from './hooks/useAuth';
 import { FullContext, Campaign, UserState } from './types';
 import { buildAudienceDescription } from './utils';
+import {
+  getOrCreateDefaultWorkspace,
+  saveWorkspaceContext,
+  workspaceToContext,
+  loadCampaigns,
+  saveCampaign,
+  deleteCampaignFromDb,
+  listWorkspaces,
+  createWorkspace,
+  renameWorkspace,
+  deleteWorkspace,
+  Workspace,
+} from './services/supabaseService';
 
 function migrateContext(ctx: any): FullContext {
   return {
@@ -62,6 +78,14 @@ interface AppContextType extends UserState {
   addCampaign: (campaign: Campaign) => void;
   updateCampaign: (id: string, updates: Partial<Campaign>) => void;
   deleteCampaign: (id: string) => void;
+  dataLoading: boolean;
+  // Workspace management
+  workspaces: Workspace[];
+  activeWorkspaceId: string | null;
+  switchWorkspace: (workspaceId: string) => void;
+  handleCreateWorkspace: (name: string) => void;
+  handleRenameWorkspace: (workspaceId: string, name: string) => void;
+  handleDeleteWorkspace: (workspaceId: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -72,45 +96,188 @@ export const useAppStore = () => {
   return context;
 };
 
-const App: React.FC = () => {
+// Inner component that has access to auth context
+const AppInner: React.FC = () => {
+  const { user, loading: authLoading } = useAuthContext();
   const [context, setContextState] = useState<FullContext | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [dataLoading, setDataLoading] = useState(true);
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null);
+  const initialLoadDone = useRef(false);
 
-  // Load from session storage on mount (with migration for old format)
+  // Load workspace data for a specific workspace
+  const loadWorkspaceData = useCallback(async (userId: string, workspace: Workspace) => {
+    const ctx = workspaceToContext(workspace);
+    if (ctx) {
+      setContextState(migrateContext(ctx));
+    } else {
+      setContextState(null);
+    }
+    const camps = await loadCampaigns(userId, workspace.id);
+    setCampaigns(camps);
+    setActiveWorkspaceId(workspace.id);
+  }, []);
+
+  // Load data: from Supabase if logged in, from sessionStorage if anonymous
   useEffect(() => {
-    // Clean up stale localStorage keys from previous versions
-    localStorage.removeItem('emailAgentApiKey');
-    localStorage.removeItem('emailAgentApiProvider');
-    localStorage.removeItem('emailAgentState');
+    if (authLoading) return;
 
-    const saved = sessionStorage.getItem('emailAgentState');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (parsed.context) setContextState(migrateContext(parsed.context));
-      if (parsed.campaigns) setCampaigns(parsed.campaigns);
+    if (user) {
+      setDataLoading(true);
+      (async () => {
+        try {
+          // Ensure default workspace exists, then load all workspaces
+          await getOrCreateDefaultWorkspace(user.id);
+          const allWorkspaces = await listWorkspaces(user.id);
+          setWorkspaces(allWorkspaces);
+
+          // Load the default workspace's data
+          const defaultWs = allWorkspaces.find(w => w.is_default) || allWorkspaces[0];
+          if (defaultWs) {
+            await loadWorkspaceData(user.id, defaultWs);
+          }
+        } catch (err) {
+          console.error('Failed to load from Supabase:', err);
+        }
+        initialLoadDone.current = true;
+        setDataLoading(false);
+      })();
+    } else {
+      // Anonymous: load from sessionStorage
+      localStorage.removeItem('emailAgentApiKey');
+      localStorage.removeItem('emailAgentApiProvider');
+      localStorage.removeItem('emailAgentState');
+
+      const saved = sessionStorage.getItem('emailAgentState');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (parsed.context) setContextState(migrateContext(parsed.context));
+          if (parsed.campaigns) setCampaigns(parsed.campaigns);
+        } catch (e) {
+          console.error('Failed to parse session state:', e);
+        }
+      }
+      setWorkspaces([]);
+      setActiveWorkspaceId(null);
+      initialLoadDone.current = true;
+      setDataLoading(false);
+    }
+  }, [user, authLoading, loadWorkspaceData]);
+
+  // Save to sessionStorage for anonymous users
+  useEffect(() => {
+    if (!initialLoadDone.current) return;
+    if (!user) {
+      sessionStorage.setItem('emailAgentState', JSON.stringify({ context, campaigns }));
+    }
+  }, [context, campaigns, user]);
+
+  // --- Workspace actions ---
+
+  const switchWorkspace = useCallback(async (workspaceId: string) => {
+    if (!user || workspaceId === activeWorkspaceId) return;
+    setDataLoading(true);
+    try {
+      const ws = workspaces.find(w => w.id === workspaceId);
+      if (ws) {
+        await loadWorkspaceData(user.id, ws);
+      }
+    } catch (err) {
+      console.error('Failed to switch workspace:', err);
+    }
+    setDataLoading(false);
+  }, [user, activeWorkspaceId, workspaces, loadWorkspaceData]);
+
+  const handleCreateWorkspace = useCallback(async (name: string) => {
+    if (!user) return;
+    try {
+      const newWs = await createWorkspace(user.id, name);
+      setWorkspaces(prev => [...prev, newWs]);
+      // Switch to the new workspace
+      setDataLoading(true);
+      await loadWorkspaceData(user.id, newWs);
+      setDataLoading(false);
+    } catch (err) {
+      console.error('Failed to create workspace:', err);
+    }
+  }, [user, loadWorkspaceData]);
+
+  const handleRenameWorkspace = useCallback(async (workspaceId: string, name: string) => {
+    try {
+      await renameWorkspace(workspaceId, name);
+      setWorkspaces(prev => prev.map(w => w.id === workspaceId ? { ...w, name } : w));
+    } catch (err) {
+      console.error('Failed to rename workspace:', err);
     }
   }, []);
 
-  // Save to session storage on change
-  useEffect(() => {
-    sessionStorage.setItem('emailAgentState', JSON.stringify({ context, campaigns }));
-  }, [context, campaigns]);
+  const handleDeleteWorkspace = useCallback(async (workspaceId: string) => {
+    if (!user) return;
+    try {
+      await deleteWorkspace(workspaceId);
+      const remaining = workspaces.filter(w => w.id !== workspaceId);
+      setWorkspaces(remaining);
 
-  const setContext = (newContext: FullContext) => {
+      // If we deleted the active workspace, switch to default
+      if (workspaceId === activeWorkspaceId && remaining.length > 0) {
+        const defaultWs = remaining.find(w => w.is_default) || remaining[0];
+        setDataLoading(true);
+        await loadWorkspaceData(user.id, defaultWs);
+        setDataLoading(false);
+      }
+    } catch (err) {
+      console.error('Failed to delete workspace:', err);
+    }
+  }, [user, workspaces, activeWorkspaceId, loadWorkspaceData]);
+
+  // --- Data actions ---
+
+  const setContext = useCallback((newContext: FullContext) => {
     setContextState(newContext);
-  };
 
-  const addCampaign = (campaign: Campaign) => {
+    if (user && activeWorkspaceId) {
+      saveWorkspaceContext(activeWorkspaceId, newContext).catch((err) =>
+        console.error('Failed to save context to Supabase:', err)
+      );
+    }
+  }, [user, activeWorkspaceId]);
+
+  const addCampaign = useCallback((campaign: Campaign) => {
     setCampaigns(prev => [campaign, ...prev]);
-  };
 
-  const updateCampaign = (id: string, updates: Partial<Campaign>) => {
-    setCampaigns(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
-  };
+    if (user && activeWorkspaceId) {
+      saveCampaign(user.id, activeWorkspaceId, campaign).catch((err) =>
+        console.error('Failed to save campaign to Supabase:', err)
+      );
+    }
+  }, [user, activeWorkspaceId]);
 
-  const deleteCampaign = (id: string) => {
+  const updateCampaign = useCallback((id: string, updates: Partial<Campaign>) => {
+    setCampaigns(prev => {
+      const updated = prev.map(c => c.id === id ? { ...c, ...updates } : c);
+      const updatedCampaign = updated.find(c => c.id === id);
+
+      if (user && activeWorkspaceId && updatedCampaign) {
+        saveCampaign(user.id, activeWorkspaceId, updatedCampaign).catch((err) =>
+          console.error('Failed to update campaign in Supabase:', err)
+        );
+      }
+
+      return updated;
+    });
+  }, [user, activeWorkspaceId]);
+
+  const deleteCampaign = useCallback((id: string) => {
     setCampaigns(prev => prev.filter(c => c.id !== id));
-  };
+
+    if (user) {
+      deleteCampaignFromDb(id).catch((err) =>
+        console.error('Failed to delete campaign from Supabase:', err)
+      );
+    }
+  }, [user]);
 
   return (
     <AppContext.Provider value={{
@@ -121,25 +288,46 @@ const App: React.FC = () => {
       addCampaign,
       updateCampaign,
       deleteCampaign,
+      dataLoading,
+      workspaces,
+      activeWorkspaceId,
+      switchWorkspace,
+      handleCreateWorkspace,
+      handleRenameWorkspace,
+      handleDeleteWorkspace,
     }}>
       <HashRouter>
         <Routes>
           <Route path="/" element={
+            dataLoading ? null :
             context ? <Navigate to="/dashboard" /> : <Navigate to="/onboarding" />
           } />
+          <Route path="/login" element={<Login />} />
+          <Route path="/upgrade-success" element={<UpgradeSuccess />} />
           <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/dashboard" element={
+            dataLoading ? null :
             context ? <Dashboard /> : <Navigate to="/onboarding" />
           } />
           <Route path="/campaigns/new" element={
+            dataLoading ? null :
             context ? <CampaignBuilder /> : <Navigate to="/onboarding" />
           } />
           <Route path="/campaigns/:id" element={
+            dataLoading ? null :
             context ? <CampaignView /> : <Navigate to="/onboarding" />
           } />
         </Routes>
       </HashRouter>
     </AppContext.Provider>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <AuthProvider>
+      <AppInner />
+    </AuthProvider>
   );
 };
 
