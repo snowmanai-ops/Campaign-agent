@@ -1,18 +1,30 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Rocket, UserPlus, Users, RotateCcw, Sparkles, MessageSquare, ArrowLeft } from 'lucide-react';
+import { Rocket, UserPlus, Users, RotateCcw, Sparkles, MessageSquare, ArrowLeft, Newspaper, DollarSign, GraduationCap, ShoppingBag, RefreshCw, CalendarHeart, Megaphone, TrendingUp } from 'lucide-react';
 import { useAppStore } from '../App';
 import { generateCampaign } from '../services/apiService';
 import { CampaignGoal } from '../types';
 import { Button, Card, Textarea } from '../components/ui';
 
 const goals: { id: CampaignGoal; label: string; icon: React.ReactNode; desc: string }[] = [
-  { id: 'welcome', label: 'Welcome Series', icon: <UserPlus size={24} />, desc: 'Build trust and introduce your brand immediately.' },
-  { id: 'nurture', label: 'Nurture Leads', icon: <Users size={24} />, desc: 'Educate prospects and move them closer to buying.' },
-  { id: 'launch', label: 'Product Launch', icon: <Rocket size={24} />, desc: 'Build hype and drive sales for a new offer.' },
-  { id: 'reengagement', label: 'Win Back', icon: <RotateCcw size={24} />, desc: 'Re-ignite interest from cold subscribers.' },
-  { id: 'onboarding', label: 'Onboarding', icon: <Sparkles size={24} />, desc: 'Help new customers get value quickly.' },
-  { id: 'custom', label: 'Custom Goal', icon: <MessageSquare size={24} />, desc: 'Describe exactly what you need.' },
+  // Acquisition
+  { id: 'welcome',       label: 'Welcome Series',      icon: <UserPlus size={24} />,       desc: 'Build trust and introduce your brand to new subscribers.' },
+  { id: 'onboarding',    label: 'Onboarding',           icon: <Sparkles size={24} />,       desc: 'Help new customers get value quickly and stick around.' },
+  { id: 'newsletter',    label: 'Newsletter',           icon: <Newspaper size={24} />,      desc: 'Send regular updates, tips, and curated content.' },
+  // Engagement & Revenue
+  { id: 'nurture',       label: 'Nurture Leads',        icon: <Users size={24} />,          desc: 'Educate prospects and move them closer to buying.' },
+  { id: 'educational',   label: 'Educational Series',   icon: <GraduationCap size={24} />,  desc: 'Teach a topic over multiple emails and build authority.' },
+  { id: 'launch',        label: 'Product Launch',       icon: <Rocket size={24} />,         desc: 'Build hype and drive sales for a new offer.' },
+  { id: 'announcement',  label: 'Announcement',         icon: <Megaphone size={24} />,      desc: 'Share a new product, feature, or company update.' },
+  { id: 'sales',         label: 'Sales Sequence',       icon: <DollarSign size={24} />,     desc: 'Close deals with objection handling and direct CTAs.' },
+  { id: 'seasonal',      label: 'Seasonal Promo',       icon: <CalendarHeart size={24} />,  desc: 'Run holiday, Black Friday, or event-based campaigns.' },
+  // Retention & Growth
+  { id: 'post_purchase',  label: 'Post-Purchase',       icon: <ShoppingBag size={24} />,    desc: 'Thank buyers, drive reviews, and cross-sell naturally.' },
+  { id: 'upsell',         label: 'Upsell / Cross-sell', icon: <TrendingUp size={24} />,     desc: 'Upgrade plans, promote add-ons, or complementary products.' },
+  { id: 'reactivation',   label: 'Re-activation',       icon: <RefreshCw size={24} />,      desc: 'Recover expired trials, lapsed clients, or cancellations.' },
+  { id: 'reengagement',   label: 'Win Back',            icon: <RotateCcw size={24} />,      desc: 'Re-ignite interest from cold or inactive subscribers.' },
+  // Always last
+  { id: 'custom',         label: 'Custom Goal',         icon: <MessageSquare size={24} />,  desc: 'Describe exactly what you need.' },
 ];
 
 export const CampaignBuilder: React.FC = () => {

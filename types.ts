@@ -134,10 +134,18 @@ export interface Campaign {
 
 export type CampaignGoal =
   | 'welcome'
-  | 'reengagement'
-  | 'launch'
-  | 'nurture'
   | 'onboarding'
+  | 'newsletter'
+  | 'nurture'
+  | 'educational'
+  | 'launch'
+  | 'announcement'
+  | 'sales'
+  | 'seasonal'
+  | 'post_purchase'
+  | 'upsell'
+  | 'reactivation'
+  | 'reengagement'
   | 'custom';
 
 export interface UserState {
