@@ -29,14 +29,6 @@ export const WorkspaceSwitcher: React.FC<WorkspaceSwitcherProps> = ({
   const menuRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Not logged in = no workspaces
-  if (!user) return null;
-
-  // Only 1 workspace and it's the default = don't show switcher
-  if (workspaces.length <= 1 && !open) {
-    // Show a subtle "add workspace" button instead
-  }
-
   const activeWorkspace = workspaces.find(w => w.id === activeWorkspaceId);
 
   useEffect(() => {
@@ -54,6 +46,9 @@ export const WorkspaceSwitcher: React.FC<WorkspaceSwitcherProps> = ({
   useEffect(() => {
     if (creating && inputRef.current) inputRef.current.focus();
   }, [creating]);
+
+  // Not logged in = no workspaces
+  if (!user) return null;
 
   const handleCreate = () => {
     const trimmed = newName.trim();
