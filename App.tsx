@@ -22,6 +22,7 @@ import {
   deleteWorkspace,
   Workspace,
 } from './services/supabaseService';
+import { setApiAuth } from './services/apiService';
 
 function migrateContext(ctx: any): FullContext {
   return {
@@ -98,13 +99,18 @@ export const useAppStore = () => {
 
 // Inner component that has access to auth context
 const AppInner: React.FC = () => {
-  const { user, loading: authLoading } = useAuthContext();
+  const { user, session, loading: authLoading } = useAuthContext();
   const [context, setContextState] = useState<FullContext | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null);
   const initialLoadDone = useRef(false);
+
+  // Keep apiService auth state in sync with current session + workspace
+  useEffect(() => {
+    setApiAuth(session?.access_token || null, activeWorkspaceId);
+  }, [session, activeWorkspaceId]);
 
   // Load workspace data for a specific workspace
   const loadWorkspaceData = useCallback(async (userId: string, workspace: Workspace) => {

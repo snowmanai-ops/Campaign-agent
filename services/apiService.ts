@@ -8,6 +8,24 @@ const toArray = (val: any): any[] => Array.isArray(val) ? val : [];
 declare const process: { env: { API_URL?: string } };
 const API_BASE = process.env.API_URL || "http://localhost:8000";
 
+// --- Auth state for premium users (set by React app) ---
+let _authToken: string | null = null;
+let _workspaceId: string | null = null;
+
+/** Called by App.tsx to keep API service in sync with current session + workspace */
+export function setApiAuth(token: string | null, workspaceId: string | null) {
+  _authToken = token;
+  _workspaceId = workspaceId;
+}
+
+/** Thrown when the backend returns 429 (daily usage limit reached) */
+export class RateLimitError extends Error {
+  constructor(message = "Daily usage limit reached. Add your own API key or try again tomorrow.") {
+    super(message);
+    this.name = "RateLimitError";
+  }
+}
+
 /** Parse email body from API response — handles string, sectioned object, or missing body */
 function parseEmailBody(body: any): string {
   if (!body) return "";
@@ -20,11 +38,22 @@ function parseEmailBody(body: any): string {
   return "";
 }
 
-/** Build common headers for API requests */
+/** Build common headers for API requests — includes auth + workspace headers when available */
 function getHeaders(contentType = true): Record<string, string> {
   const headers: Record<string, string> = {};
   if (contentType) headers["Content-Type"] = "application/json";
+  if (_authToken) headers["Authorization"] = `Bearer ${_authToken}`;
+  if (_workspaceId) headers["X-Workspace-Id"] = _workspaceId;
   return headers;
+}
+
+/** Check response for rate limiting before returning */
+async function checkResponse(response: Response): Promise<Response> {
+  if (response.status === 429) {
+    const data = await response.json().catch(() => ({}));
+    throw new RateLimitError(data.detail || undefined);
+  }
+  return response;
 }
 
 /**
@@ -32,7 +61,7 @@ function getHeaders(contentType = true): Record<string, string> {
  */
 export const analyzeContext = async (inputText: string): Promise<FullContext> => {
   try {
-    const response = await fetch(`${API_BASE}/api/context/process`, {
+    const rawResponse = await fetch(`${API_BASE}/api/context/process`, {
       method: "POST",
       headers: getHeaders(),
       body: JSON.stringify({
@@ -45,6 +74,7 @@ export const analyzeContext = async (inputText: string): Promise<FullContext> =>
         }
       }),
     });
+    const response = await checkResponse(rawResponse);
 
     if (!response.ok) {
       const error = await response.json();
@@ -139,11 +169,12 @@ export const extractTextFromFile = async (file: File): Promise<{ text: string; f
   formData.append("file", file);
   formData.append("extract_only", "true");
 
-  const response = await fetch(`${API_BASE}/api/context/process/file`, {
+  const rawResponse = await fetch(`${API_BASE}/api/context/process/file`, {
     method: "POST",
     headers: getHeaders(false),
     body: formData,
   });
+  const response = await checkResponse(rawResponse);
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ detail: "Failed to extract text from file" }));
@@ -157,11 +188,12 @@ export const extractTextFromFile = async (file: File): Promise<{ text: string; f
  * Scrape a URL and extract visible text content
  */
 export const extractTextFromUrl = async (url: string): Promise<{ text: string; url: string; title: string }> => {
-  const response = await fetch(`${API_BASE}/api/context/process/url`, {
+  const rawResponse = await fetch(`${API_BASE}/api/context/process/url`, {
     method: "POST",
     headers: getHeaders(),
     body: JSON.stringify({ url }),
   });
+  const response = await checkResponse(rawResponse);
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ detail: "Failed to extract text from URL" }));
@@ -241,11 +273,12 @@ export const saveContext = async (context: FullContext): Promise<void> => {
       },
     };
 
-    const response = await fetch(`${API_BASE}/api/context/save-processed`, {
+    const rawResponse = await fetch(`${API_BASE}/api/context/save-processed`, {
       method: "POST",
       headers: getHeaders(),
       body: JSON.stringify(apiContext),
     });
+    const response = await checkResponse(rawResponse);
 
     if (!response.ok) {
       throw new Error("Failed to save context");
@@ -268,7 +301,7 @@ export const generateCampaign = async (
     await saveContext(context);
 
     // Then generate the campaign
-    const response = await fetch(`${API_BASE}/api/campaigns/`, {
+    const rawCampaignResponse = await fetch(`${API_BASE}/api/campaigns/`, {
       method: "POST",
       headers: getHeaders(),
       body: JSON.stringify({
@@ -276,6 +309,7 @@ export const generateCampaign = async (
         additional_details: additionalDetails || null,
       }),
     });
+    const response = await checkResponse(rawCampaignResponse);
 
     if (!response.ok) {
       const error = await response.json();
@@ -315,9 +349,10 @@ export const generateCampaign = async (
  */
 export const getCampaign = async (campaignId: string): Promise<Campaign | null> => {
   try {
-    const response = await fetch(`${API_BASE}/api/campaigns/${campaignId}`, {
+    const rawResponse = await fetch(`${API_BASE}/api/campaigns/${campaignId}`, {
       headers: getHeaders(false),
     });
+    const response = await checkResponse(rawResponse);
 
     if (!response.ok) {
       return null;
@@ -367,11 +402,12 @@ export const updateEmail = async (
       apiUpdates.body = updates.body;
     }
 
-    const response = await fetch(`${API_BASE}/api/campaigns/${campaignId}/emails/${emailId}`, {
+    const rawResponse = await fetch(`${API_BASE}/api/campaigns/${campaignId}/emails/${emailId}`, {
       method: "PUT",
       headers: getHeaders(),
       body: JSON.stringify(apiUpdates),
     });
+    const response = await checkResponse(rawResponse);
 
     if (!response.ok) {
       throw new Error("Failed to update email");
@@ -390,9 +426,10 @@ export const exportCampaign = async (
   format: "json" | "txt" | "csv" = "txt"
 ): Promise<string> => {
   try {
-    const response = await fetch(`${API_BASE}/api/campaigns/${campaignId}/export?format=${format}`, {
+    const rawResponse = await fetch(`${API_BASE}/api/campaigns/${campaignId}/export?format=${format}`, {
       headers: getHeaders(false),
     });
+    const response = await checkResponse(rawResponse);
 
     if (!response.ok) {
       throw new Error("Failed to export campaign");
@@ -408,6 +445,35 @@ export const exportCampaign = async (
     console.error("Failed to export campaign:", error);
     throw error;
   }
+};
+
+/**
+ * Get current usage stats for the authenticated user
+ */
+export const getUsage = async (): Promise<{
+  campaigns_today: number;
+  daily_limit: number;
+  has_own_key: boolean;
+}> => {
+  const response = await fetch(`${API_BASE}/api/usage/`, {
+    headers: getHeaders(false),
+  });
+  await checkResponse(response);
+  if (!response.ok) throw new Error("Failed to fetch usage");
+  return response.json();
+};
+
+/**
+ * Save or remove the user's own API key
+ */
+export const setUserApiKey = async (apiKey: string): Promise<void> => {
+  const response = await fetch(`${API_BASE}/api/usage/api-key`, {
+    method: "PUT",
+    headers: getHeaders(),
+    body: JSON.stringify({ api_key: apiKey }),
+  });
+  await checkResponse(response);
+  if (!response.ok) throw new Error("Failed to save API key");
 };
 
 /**
