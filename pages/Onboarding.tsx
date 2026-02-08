@@ -620,10 +620,10 @@ export const Onboarding: React.FC = () => {
       </header>
       <div className="mb-12 text-center">
         <h1 className="text-3xl sm:text-5xl font-bold text-slate-900 mb-6 tracking-tight">
-          Your email campaigns ready to launch in <span className="text-indigo-600">3 minutes</span>
+          Your email campaigns, ready in <span className="text-indigo-600">3 minutes</span>
         </h1>
         <p className="text-gray-500 text-lg sm:text-xl leading-relaxed max-w-2xl mx-auto">
-          Upload files, paste URLs, or add text — the more context you give, the better your campaigns.
+          Feed it your brand details & get back a full email strategy with copy ready to send
         </p>
       </div>
 
@@ -643,7 +643,7 @@ export const Onboarding: React.FC = () => {
         >
           <UploadCloud size={40} className={`transition-colors duration-200 ${isDragOver ? 'text-indigo-400' : 'text-gray-300'}`} />
           <p className={`font-medium text-base mt-4 transition-colors duration-200 ${isDragOver ? 'text-indigo-600' : 'text-gray-500'}`}>
-            {isDragOver ? 'Drop files here' : 'Drag & drop your files here'}
+            {isDragOver ? 'Drop files here' : 'Drag & drop your files here (e.g. brand guides, product pages, past campaigns)'}
           </p>
           <p className="text-gray-400 text-sm mt-1">
             pdf, docx, txt, md, csv
@@ -732,13 +732,13 @@ export const Onboarding: React.FC = () => {
           isLoading={isAnalyzing}
           className="h-14 px-8 text-lg rounded-full shadow-xl shadow-indigo-200 hover:shadow-indigo-300 hover:-translate-y-1 transition-all"
         >
-          {isAnalyzing ? "Analyzing Business..." : "Generate My Agent"} <ArrowRight className="ml-2" />
+          {isAnalyzing ? "Analyzing Business..." : "Build My Campaigns"} <ArrowRight className="ml-2" />
         </Button>
       </div>
 
       {/* Example suggestions */}
       <div className="mt-12 flex flex-wrap justify-center gap-4 text-sm text-gray-400">
-        <span>Not inspired? Try one of these:</span>
+        <span>Quick start:</span>
         <button
           onClick={() => addExampleSource("B2B SaaS Onboarding", "We offer a B2B SaaS analytics platform for enterprise sales teams that helps them close 20% more deals. Our platform integrates with existing CRM systems and provides real-time coaching during sales calls. We target VP of Sales and Sales Directors at mid-market companies with 50-500 employees. Our pricing starts at $299/month per seat with a 30-day free trial and money-back guarantee.")}
           className="hover:text-indigo-600 underline decoration-dotted cursor-pointer"
